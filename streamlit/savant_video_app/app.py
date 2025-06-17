@@ -5,9 +5,7 @@ from app_utils.savant_scraper import SavantScraper
 from app_utils.player_lookup import load_player_id_map
 from app_utils.downloader import create_zip_in_memory
 import os
-import base64
 from datetime import datetime, timedelta
-from PIL import Image
 
 def display_header():
     """
@@ -18,27 +16,18 @@ def display_header():
     
     # Logo and motto column
     with col1:
-        logo_path = "assets/logo-old.png"
-        if os.path.exists(logo_path):
-            try:
-                # Create clickable logo using HTML
-                with open(logo_path, "rb") as img_file:
-                    img_base64 = base64.b64encode(img_file.read()).decode()
-                
-                st.markdown(f"""
-                <a href="https://github.com/BaseballCV" target="_blank">
-                    <img src="data:image/png;base64,{img_base64}" width="120" style="cursor: pointer;">
-                </a>
-                """, unsafe_allow_html=True)
-            except Exception as e:
-                # Fallback with clickable emoji if logo fails to load
-                st.markdown("""
-                <a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; font-size: 48px;">
-                🏀⚾
-                </a>
-                """, unsafe_allow_html=True)
-        else:
-            # Fallback with clickable emoji if logo file not found
+        # Use logo from i.ibb.co hotlink
+        logo_url = "https://i.ibb.co/jP339csq/logo-old.jpg"
+        
+        try:
+            # Create clickable logo using the direct image URL
+            st.markdown(f"""
+            <a href="https://github.com/BaseballCV" target="_blank">
+                <img src="{logo_url}" width="120" style="cursor: pointer; border-radius: 8px;">
+            </a>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            # Fallback with clickable emoji if logo fails to load
             st.markdown("""
             <a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; font-size: 48px;">
             🏀⚾
@@ -226,7 +215,7 @@ def main():
     st.markdown("""
     <div style='text-align: center; color: #666; padding: 20px;'>
         <small>
-        🏀⚾ <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
+        ⚾ <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
         Built with Streamlit • Data from Baseball Savant • Videos from MLB
         </small>
     </div>
