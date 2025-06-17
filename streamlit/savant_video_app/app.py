@@ -18,7 +18,7 @@ def display_header():
     
     # Logo and motto column
     with col1:
-        logo_path = "assets/logo.png"
+        logo_path = "assets/logo-old.png"
         if os.path.exists(logo_path):
             try:
                 # Create clickable logo using HTML
