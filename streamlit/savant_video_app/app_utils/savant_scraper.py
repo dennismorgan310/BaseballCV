@@ -61,29 +61,142 @@ class SavantScraper:
             return "NO_PLAY_ID_FOUND"
         return f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
 
+    def _format_savant_payload(self, search_params: dict, max_results: int) -> dict:
+        """
+        Formats parameters to match Baseball Savant's expected format.
+        Based on analysis of working Baseball Savant URLs.
+        """
+        # Start with all the standard empty parameters that Baseball Savant expects
+        payload = {
+            'hfPT': '',
+            'hfAB': '',
+            'hfGT': 'R|',  # Regular season only
+            'hfPR': '',
+            'hfZ': '',
+            'hfStadium': '',
+            'hfBBL': '',
+            'hfNewZones': '',
+            'hfPull': '',
+            'hfC': '',
+            'hfSea': '2025|',  # Current season with pipe
+            'hfSit': '',
+            'player_type': 'pitcher',
+            'hfOuts': '',
+            'hfOpponent': '',
+            'pitcher_throws': '',
+            'batter_stands': '',
+            'hfSA': '',
+            'hfMo': '',
+            'hfTeam': '',
+            'home_road': '',
+            'hfRO': '',
+            'position': '',
+            'hfInfield': '',
+            'hfOutfield': '',
+            'hfInn': '',
+            'hfBBT': '',
+            'hfFlag': '',
+            'group_by': 'name',
+            'min_pitches': '0',
+            'min_results': '0', 
+            'min_pas': '0',
+            'sort_col': 'pitches',
+            'player_event_sort': 'api_p_release_speed',
+            'sort_order': 'desc',
+            'all': 'true',
+            'type': 'details'
+        }
+        
+        # Now override with our specific search parameters
+        for key, values in search_params.items():
+            if not values:  # Skip empty values
+                continue
+                
+            if key == 'game_date_gt':
+                payload['game_date_gt'] = values[0]
+            elif key == 'game_date_lt':
+                payload['game_date_lt'] = values[0]
+            elif key == 'hfPT':  # Pitch types
+                payload['hfPT'] = '|'.join(values) + '|'
+            elif key == 'hfAB':  # PA results
+                payload['hfAB'] = '|'.join(values) + '|'
+            elif key == 'hfTeam':  # Teams
+                payload['hfTeam'] = '|'.join(values) + '|'
+            elif key == 'pitchers_lookup[]':
+                payload['pitchers_lookup[]'] = '|'.join(map(str, values))
+            elif key == 'batters_lookup[]':
+                payload['batters_lookup[]'] = '|'.join(map(str, values))
+            elif key == 'player_type':
+                payload['player_type'] = values[0]
+            elif key.startswith('metric_'):
+                # Handle metric parameters directly
+                payload[key] = values[0] if len(values) == 1 else '|'.join(map(str, values))
+        
+        # Set max results
+        payload['h_max'] = str(max_results)
+        
+        return payload
+
     def get_data_by_filters(self, search_params: dict, max_results: int = 50) -> pd.DataFrame:
         """
         Fetches and processes Statcast data for a set of search filters.
         """
-        query_params = search_params.copy()
-        query_params['hf_video'] = ['1']
-        payload = {key: '|'.join(map(str, val)) for key, val in query_params.items() if val}
-        payload.update({'h_max': max_results, 'all': 'true', 'type': 'details'})
+        # Format payload to match Baseball Savant's expected format
+        payload = self._format_savant_payload(search_params, max_results)
         
-        print(f"--- DEBUG: Sending Request to Statcast ---\nPayload: {payload}")
+        # Debug output for metric parameters
+        metric_params = {k: v for k, v in payload.items() if k.startswith('metric_')}
+        if metric_params:
+            print("--- DEBUG: Metric Parameters ---")
+            for k, v in metric_params.items():
+                print(f"{k}: {v}")
+        
+        print(f"--- DEBUG: Sending Request to Statcast ---")
+        print(f"URL: {self.search_api_url}")
+        print(f"Key parameters: hfPT={payload.get('hfPT')}, hfGT={payload.get('hfGT')}, hfSea={payload.get('hfSea')}")
+        print(f"Date range: {payload.get('game_date_gt')} to {payload.get('game_date_lt')}")
+        
         try:
             response = requests.get(self.search_api_url, params=payload, timeout=90)
             response.raise_for_status()
             
-            csv_data = StringIO(response.text)
-            if not csv_data.getvalue().strip():
+            csv_content = response.text.strip()
+            
+            if not csv_content:
                 print("DEBUG: Statcast search returned no data.")
                 return pd.DataFrame()
 
-            df = pd.read_csv(csv_data)
+            # Debug: Show first few lines of response
+            lines = csv_content.split('\n')
+            print(f"DEBUG: Response contains {len(lines)} lines")
+            print("DEBUG: First line (headers):", lines[0] if lines else "No lines")
+            
+            # Check if response is an error
+            if lines[0].strip().lower() == '"error"':
+                print("DEBUG: Baseball Savant returned an error response")
+                if len(lines) > 1:
+                    print(f"DEBUG: Error details: {lines[1]}")
+                return pd.DataFrame()
+            
+            df = pd.read_csv(StringIO(csv_content))
             print(f"DEBUG: Initial Statcast search returned {len(df)} rows.")
+            
             if df.empty:
+                print("DEBUG: DataFrame is empty after parsing CSV")
                 return df
+
+            # Check if we have the required columns
+            required_cols = ['game_pk', 'at_bat_number', 'pitch_number']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if missing_cols:
+                print(f"DEBUG: Missing required columns: {missing_cols}")
+                print(f"DEBUG: Available columns: {list(df.columns)}")
+                # If we're missing core columns, there might be a different issue
+                # Let's see what we actually got
+                if len(df.columns) < 10:  # Probably an error response
+                    print("DEBUG: Too few columns returned, likely an API error")
+                    print(f"DEBUG: Full response preview:\n{csv_content[:500]}")
+                return pd.DataFrame()
 
             # --- Gumbo Enrichment Step ---
             print("DEBUG: Enriching with Gumbo data to find playIds...")
@@ -109,11 +222,15 @@ class SavantScraper:
                 df.loc[game_indices, 'play_id'] = found_ids
 
             # --- Final Processing ---
+            initial_count = len(df)
             df.dropna(subset=['play_id'], inplace=True)
-            print(f"DEBUG: Found {len(df)} rows with a valid 'play_id' from Gumbo.")
+            final_count = len(df)
+            
+            print(f"DEBUG: Found {final_count} rows with valid 'play_id' from Gumbo out of {initial_count} total rows.")
             
             if not df.empty:
                 df['video_url'] = df['play_id'].apply(self._construct_video_url)
+                print(f"DEBUG: Successfully created video URLs for {len(df)} plays.")
 
             return df
             
@@ -122,10 +239,14 @@ class SavantScraper:
             return pd.DataFrame()
         except Exception as e:
             print(f"--- DEBUG: An unexpected error occurred ---\nError: {e}")
+            import traceback
+            print(f"DEBUG: Full traceback:\n{traceback.format_exc()}")
             return pd.DataFrame()
 
     def get_data_by_play_id(self, game_pk: int, at_bat_number: int, pitch_number: int) -> pd.DataFrame:
-        # This function can be simplified as get_data_by_filters now handles enrichment
+        """
+        Fetch data for a specific play by its identifiers.
+        """
         params = {'game_pk': [game_pk]}
         df = self.get_data_by_filters(params, max_results=500)
         
@@ -136,5 +257,6 @@ class SavantScraper:
                 (df['at_bat_number'] == at_bat_number) &
                 (df['pitch_number'] == pitch_number)
             ].copy()
+            print(f"DEBUG: Found {len(play_df)} matches for game_pk={game_pk}, at_bat={at_bat_number}, pitch={pitch_number}")
             return play_df
         return pd.DataFrame()
