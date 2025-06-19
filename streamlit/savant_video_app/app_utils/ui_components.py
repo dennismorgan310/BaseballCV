@@ -223,7 +223,7 @@ def display_search_interface(player_df):
     
     # Highlights mode - prominent button at top
     st.sidebar.markdown("### Quick Highlights")
-    if st.sidebar.button("Find Highlights", type="primary", use_container_width=True, help="Automatically find the top 10 hardest hit balls (home runs prioritized) for selected batter(s). Steps down from 110+ mph exit velocity until finding 10 plays."):
+    if st.sidebar.button("Find Highlights", type="primary", use_container_width=True, help="Automatically find highlight plays for selected batter(s) or pitcher(s). Choose between batter highlights (hardest hit balls) or pitcher highlights (strikeouts with 2 strikes)."):
         st.session_state.search_mode = 'highlights'
     
     st.sidebar.markdown("---")
@@ -257,32 +257,57 @@ def display_highlights_search(player_df):
     start_date = st.sidebar.date_input("Start Date", default_start, key="highlights_start")
     end_date = st.sidebar.date_input("End Date", today, key="highlights_end")
     
-    st.sidebar.markdown("##### Select Batter(s)")
-    selected_batters = st.sidebar.multiselect("Batter(s) for Highlights", player_names, key="highlights_batters")
+    st.sidebar.markdown("##### Highlights Type")
+    highlights_type = st.sidebar.radio(
+        "Choose highlights type:",
+        options=["Batter Highlights", "Pitcher Highlights"],
+        index=0,
+        key="highlights_type"
+    )
     
-    # Add explanation of highlights mode
-    st.sidebar.info("**Highlights Mode:** Finds the top 10 hardest hit balls (starting at 110+ mph exit velocity, stepping down by 5 mph until 10 plays are found). Home runs are prioritized.")
+    if highlights_type == "Batter Highlights":
+        st.sidebar.markdown("##### Select Batter(s)")
+        selected_players = st.sidebar.multiselect("Batter(s) for Highlights", player_names, key="highlights_batters")
+        player_type = 'batter'
+        
+        # Add explanation of batter highlights mode
+        st.sidebar.info("**Batter Highlights:** Finds the top 10 hardest hit balls (starting at 110+ mph exit velocity, stepping down by 5 mph, minimum 95 mph). Prioritizes Home Runs > Triples > Doubles > Singles, sorted by distance projected.")
+        
+    else:  # Pitcher Highlights
+        st.sidebar.markdown("##### Select Pitcher(s)")
+        selected_players = st.sidebar.multiselect("Pitcher(s) for Highlights", player_names, key="highlights_pitchers")
+        player_type = 'pitcher'
+        
+        # Add explanation of pitcher highlights mode
+        st.sidebar.info("**Pitcher Highlights:** Finds the last 10 strikeout pitches with 2 strikes in the count (swinging strikes or called strikes only). Sorted by most recent.")
     
-    if not selected_batters:
-        st.sidebar.warning("Please select at least one batter to find highlights")
-        return None, None, start_date, end_date, None
+    if not selected_players:
+        st.sidebar.warning(f"Please select at least one {player_type} to find highlights")
+        return None, None, start_date, end_date, None, highlights_type
     
-    batter_ids = [int(player_df[player_df['name'] == name].iloc[0]['id']) for name in selected_batters]
+    player_ids = [int(player_df[player_df['name'] == name].iloc[0]['id']) for name in selected_players]
     
     # Auto-configure search parameters for highlights
     params['game_date_gt'] = [start_date.strftime('%Y-%m-%d')]
     params['game_date_lt'] = [end_date.strftime('%Y-%m-%d')]
-    params['batters_lookup[]'] = batter_ids
     params['hfGT'] = ['R']  # Regular season only
     params['hfSea'] = [str(datetime.datetime.now().year)]
-    params['player_type'] = ['batter']
+    params['player_type'] = [player_type]
     
-    # Set pitch result for highlights (hit into play - this covers all batted balls including home runs)
-    params['hfPR'] = ['hit_into_play']  # Pitch result: hit into play (covers all contact)
+    if player_type == 'batter':
+        params['batters_lookup[]'] = player_ids
+        # Set pitch result for batter highlights (hit into play - covers all contact)
+        params['hfPR'] = ['hit_into_play']
+    else:  # pitcher
+        params['pitchers_lookup[]'] = player_ids
+        # Set specific parameters for pitcher highlights
+        params['hfAB'] = ['strikeout']  # PA result: strikeouts only
+        params['hfPR'] = ['swinging_strike', 'called_strike']  # Pitch result: swinging or called strikes
+        params['hfC'] = ['02', '12', '22', '32']  # Count: any count with 2 strikes
     
     max_results = 200  # Get more results to filter through
     
-    return params, max_results, start_date, end_date, selected_batters
+    return params, max_results, start_date, end_date, selected_players, highlights_type
 
 def display_search_filters(player_df):
     params = {}
@@ -410,4 +435,4 @@ def display_play_id_search():
     game_pk = st.sidebar.number_input("Game PK", step=1, value=None)
     at_bat_number = st.sidebar.number_input("At Bat Number", step=1, value=None)
     pitch_number = st.sidebar.number_input("Pitch Number", step=1, value=None)
-    return game_pk, at_bat_number, pitch_number, None, None
+    return game_pk, at_bat_number, pitch_number, None, None     

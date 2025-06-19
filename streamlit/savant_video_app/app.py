@@ -57,9 +57,9 @@ def display_header():
     or look up specific plays by their identifiers. Selected plays can be downloaded as video files.
     """)
 
-def find_highlights(scraper, search_params, max_results, selected_batters):
+def find_batter_highlights(scraper, search_params, max_results, selected_players):
     """
-    Find top 10 highlight plays using stepping algorithm for exit velocity.
+    Find top 10 batter highlight plays using stepping algorithm for exit velocity.
     Steps down from 110+ mph in 5 mph increments until finding 10 plays.
     Prioritizes: Home Runs > Triples > Doubles > Singles, sorted by distance projected.
     """
@@ -69,7 +69,7 @@ def find_highlights(scraper, search_params, max_results, selected_batters):
     current_velo = min_exit_velo
     min_acceptable_velo = 95  # Don't go below 95 mph
     
-    st.write("**Searching for highlights with smart exit velocity filtering...**")
+    st.write("**Searching for batter highlights with smart exit velocity filtering...**")
     
     all_plays = []
     attempts = []
@@ -159,7 +159,7 @@ def find_highlights(scraper, search_params, max_results, selected_batters):
                 pa_name = pa_result.replace('_', ' ').title()
                 pa_summary.append(f"{count} {pa_name}{'s' if count != 1 else ''}")
         
-        st.success(f"**Found {len(highlights_df)} highlight plays for {', '.join(selected_batters)}** ({', '.join(pa_summary)})")
+        st.success(f"**Found {len(highlights_df)} batter highlight plays for {', '.join(selected_players)}** ({', '.join(pa_summary)})")
         
         if attempts:
             st.info(f"**Search Summary:** Found plays with exit velocity from {max(attempts[-1]['min_velo'], min_acceptable_velo)}+ to {attempts[0]['min_velo']}+ mph")
@@ -170,8 +170,83 @@ def find_highlights(scraper, search_params, max_results, selected_batters):
         
         return highlights_df
     else:
-        st.warning(f"No highlight plays found for {', '.join(selected_batters)} in the selected date range.")
+        st.warning(f"No batter highlight plays found for {', '.join(selected_players)} in the selected date range.")
         st.info("Try expanding the date range or selecting different batters. Only Home Runs, Triples, Doubles, and Singles with 95+ mph exit velocity qualify as highlights.")
+        return pd.DataFrame()
+
+def find_pitcher_highlights(scraper, search_params, max_results, selected_players):
+    """
+    Find top 10 pitcher highlight plays - strikeouts with 2 strikes in the count.
+    Looks for swinging strikes or called strikes that resulted in strikeouts.
+    Sorted by most recent.
+    """
+    target_plays = 10
+    
+    st.write("**Searching for pitcher highlights - strikeouts with 2 strikes...**")
+    st.write(f"DEBUG: find_pitcher_highlights called with:")
+    st.write(f"DEBUG: scraper = {scraper}")
+    st.write(f"DEBUG: search_params = {search_params}")
+    st.write(f"DEBUG: max_results = {max_results}")
+    st.write(f"DEBUG: selected_players = {selected_players}")
+    
+    try:
+        st.write("DEBUG: About to call scraper.get_data_by_filters")
+        df = scraper.get_data_by_filters(search_params, max_results)
+        st.write(f"DEBUG: scraper.get_data_by_filters returned successfully, df shape: {df.shape}")
+        
+        if not df.empty:
+            st.write(f"Found {len(df)} potential strikeout pitches")
+            
+            # Additional filtering to ensure we have the exact criteria
+            df_filtered = df[
+                (df['events'] == 'strikeout') &  # PA result must be strikeout
+                df['description'].isin(['swinging_strike', 'called_strike']) &  # Pitch result
+                df['strikes'] == 2  # Must have 2 strikes in the count
+            ].copy()
+            
+            if not df_filtered.empty:
+                # Sort by most recent: game_date desc, then game_pk desc, then inning desc, then at_bat desc, then pitch desc
+                sort_columns = ['game_date', 'game_pk', 'inning', 'at_bat_number', 'pitch_number']
+                existing_sort_cols = [col for col in sort_columns if col in df_filtered.columns]
+                
+                if existing_sort_cols:
+                    df_filtered = df_filtered.sort_values(by=existing_sort_cols, ascending=False)
+                
+                # Take the most recent target_plays
+                highlights_df = df_filtered.head(target_plays)
+                
+                # Create pitch type summary
+                pitch_types = highlights_df['pitch_type'].value_counts()
+                pitch_summary = []
+                for pitch_type, count in pitch_types.items():
+                    pitch_summary.append(f"{count} {pitch_type}")
+                
+                # Create description summary (swinging vs called)
+                description_counts = highlights_df['description'].value_counts()
+                desc_summary = []
+                for desc, count in description_counts.items():
+                    desc_name = desc.replace('_', ' ').title()
+                    desc_summary.append(f"{count} {desc_name}{'s' if count != 1 else ''}")
+                
+                st.success(f"**Found {len(highlights_df)} pitcher highlight plays for {', '.join(selected_players)}** ({', '.join(desc_summary)})")
+                
+                if pitch_summary:
+                    st.info(f"**Pitch Types:** {', '.join(pitch_summary)}")
+                
+                return highlights_df
+            else:
+                st.warning(f"No strikeout pitches with 2 strikes found for {', '.join(selected_players)} in the selected date range.")
+                st.info("Try expanding the date range or selecting different pitchers.")
+                return pd.DataFrame()
+        else:
+            st.warning(f"No plays found for {', '.join(selected_players)} in the selected date range.")
+            return pd.DataFrame()
+            
+    except Exception as e:
+        st.error(f"Error in find_pitcher_highlights: {str(e)}")
+        import traceback
+        st.write("DEBUG: Full traceback in find_pitcher_highlights:")
+        st.code(traceback.format_exc())
         return pd.DataFrame()
 
 def main():
@@ -206,25 +281,51 @@ def main():
     perform_search = False
 
     if search_pressed:
+        st.write(f"DEBUG: Search button pressed")
+        st.write(f"DEBUG: query_mode = {query_mode}")
+        st.write(f"DEBUG: params = {params}")
+        st.write(f"DEBUG: params length = {len(params) if params else 'None'}")
+        
         # Clear previous search results and download states on new search
         st.session_state.results_df = pd.DataFrame()
         st.session_state.zip_buffers = []
         st.session_state.concatenated_video = None
         
-        if query_mode == 'filters':
-            _, _, start_date, end_date = params
-            if (end_date - start_date) > timedelta(days=5):
-                st.session_state.show_date_warning = True
+        try:
+            if query_mode == 'filters':
+                st.write("DEBUG: Processing filters logic")
+                # filters mode: params, max_results, start_date, end_date
+                if params and len(params) >= 4:
+                    st.write("DEBUG: About to unpack filters params")
+                    search_params, max_results, start_date, end_date = params[0], params[1], params[2], params[3]
+                    if (end_date - start_date) > timedelta(days=5):
+                        st.session_state.show_date_warning = True
+                    else:
+                        perform_search = True
+                else:
+                    st.sidebar.error("Invalid filter parameters")
+            elif query_mode == 'highlights':
+                st.write("DEBUG: Processing highlights logic")
+                # highlights mode: params, max_results, start_date, end_date, selected_players, highlights_type
+                if params and len(params) >= 6 and params[4]:  # Check if selected_players exists
+                    st.write("DEBUG: Highlights params look good")
+                    perform_search = True
+                else:
+                    st.sidebar.error("Please select at least one player for highlights mode")
+            elif query_mode == 'play_id':
+                st.write("DEBUG: Processing play_id logic")
+                # play_id mode: game_pk, at_bat_number, pitch_number, None, None
+                if params and len(params) >= 5 and all(params[:3]):
+                    perform_search = True
+                else:
+                    st.sidebar.error("Please provide all three Play ID values")
             else:
-                perform_search = True
-        elif query_mode == 'highlights':
-            # For highlights, check if batters are selected
-            if params and len(params) > 4 and params[4]:  # params[4] contains selected_batters
-                perform_search = True
-            else:
-                st.sidebar.error("Please select at least one batter for highlights mode")
-        else: # For play_id search, no warning needed
-            perform_search = True
+                st.sidebar.error("Unknown search mode")
+        except Exception as e:
+            st.error(f"Error in search button logic: {e}")
+            import traceback
+            st.write("DEBUG: Traceback in search button logic:")
+            st.code(traceback.format_exc())
 
     if st.session_state.get('show_date_warning'):
         st.sidebar.warning("Large date range selected. This may be slow.")
@@ -259,9 +360,10 @@ def main():
         # Check if this was a highlights search
         if query_mode == 'highlights':
             st.subheader("Highlights Results")
-            if len(params) > 4 and params[4]:  # Check if selected_batters exists
-                selected_batters = params[4]
-                st.info(f"**Highlights for:** {', '.join(selected_batters)} • **{len(st.session_state.results_df)} plays found**")
+            if params and len(params) >= 6 and params[4] and params[5]:  # Check if selected_players and highlights_type exist
+                selected_players = params[4]
+                highlights_type = params[5]
+                st.info(f"**{highlights_type} for:** {', '.join(selected_players)} • **{len(st.session_state.results_df)} plays found**")
         else:
             st.subheader("Search Results")
         
@@ -291,10 +393,22 @@ def main():
         
         # Results summary - special handling for highlights mode
         if query_mode == 'highlights':
-            if 'launch_speed' in results_df.columns:
-                avg_exit_velo = results_df['launch_speed'].mean()
-                max_exit_velo = results_df['launch_speed'].max()
-                st.success(f"Found **{len(df_for_display)} highlight plays** • Avg Exit Velocity: **{avg_exit_velo:.1f} mph** • Max: **{max_exit_velo:.1f} mph**")
+            if params and len(params) >= 6 and params[5]:  # Check if highlights_type exists
+                highlights_type = params[5]
+                if highlights_type == "Batter Highlights" and 'launch_speed' in results_df.columns:
+                    avg_exit_velo = results_df['launch_speed'].mean()
+                    max_exit_velo = results_df['launch_speed'].max()
+                    st.success(f"Found **{len(df_for_display)} batter highlight plays** • Avg Exit Velocity: **{avg_exit_velo:.1f} mph** • Max: **{max_exit_velo:.1f} mph**")
+                elif highlights_type == "Pitcher Highlights":
+                    # Show pitch velocity stats for pitcher highlights
+                    if 'release_speed' in results_df.columns:
+                        avg_pitch_speed = results_df['release_speed'].mean()
+                        max_pitch_speed = results_df['release_speed'].max()
+                        st.success(f"Found **{len(df_for_display)} pitcher highlight plays** • Avg Pitch Speed: **{avg_pitch_speed:.1f} mph** • Max: **{max_pitch_speed:.1f} mph**")
+                    else:
+                        st.success(f"Found **{len(df_for_display)} pitcher highlight plays**")
+                else:
+                    st.success(f"Found **{len(df_for_display)} highlight plays**")
             else:
                 st.success(f"Found **{len(df_for_display)} highlight plays**")
         else:

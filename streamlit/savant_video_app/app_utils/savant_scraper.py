@@ -149,14 +149,18 @@ class SavantScraper:
         # Set max results
         payload['h_max'] = str(max_results)
         
-        return payload, search_params.get('pitchers_lookup[]'), search_params.get('batters_lookup[]')
+        return payload
 
     def get_data_by_filters(self, search_params: dict, max_results: int = 50) -> pd.DataFrame:
         """
         Fetches and processes Statcast data for a set of search filters.
         """
         # Format payload to match Baseball Savant's expected format
-        payload, pitcher_ids, batter_ids = self._format_savant_payload(search_params, max_results)
+        payload = self._format_savant_payload(search_params, max_results)
+        
+        # Extract pitcher and batter IDs from search_params
+        pitcher_ids = search_params.get('pitchers_lookup[]', [])
+        batter_ids = search_params.get('batters_lookup[]', [])
         
         # Debug output for metric parameters
         metric_params = {k: v for k, v in payload.items() if k.startswith('metric_')}
