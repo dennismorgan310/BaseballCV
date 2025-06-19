@@ -3,7 +3,7 @@ import pandas as pd
 from app_utils.ui_components import display_search_interface
 from app_utils.savant_scraper import SavantScraper
 from app_utils.player_lookup import load_player_id_map
-from app_utils.downloader import create_zip_in_memory, create_concatenated_video
+from app_utils.downloader import create_zip_in_memory, create_concatenated_video, create_simple_ordered_videos
 import os
 from datetime import datetime, timedelta
 
@@ -81,6 +81,8 @@ def main():
         st.session_state.zip_buffers = []
     if 'concatenated_video' not in st.session_state:
         st.session_state.concatenated_video = None
+    if 'last_download_format' not in st.session_state:
+        st.session_state.last_download_format = None
 
     # --- Search Logic ---
     search_pressed = st.sidebar.button("🔍 Search", type="primary", use_container_width=True)
@@ -173,20 +175,30 @@ def main():
             # Download format selection
             download_format = st.radio(
                 "Choose download format:",
-                options=["Individual videos in zip file", "Single concatenated video file"],
+                options=[
+                    "Individual videos in zip file", 
+                    "Single concatenated video file",
+                    "Ordered videos for manual concatenation"
+                ],
                 index=0,
-                help="Individual videos: Each play as a separate MP4 file in a zip archive. Concatenated: All plays joined into one continuous video file."
+                help="Individual videos: Each play as a separate MP4 file. Concatenated: All plays joined into one video (fast with FFmpeg). Ordered: Sequential numbered files for easy manual concatenation."
             )
+            
+            # Clear previous downloads if format changed
+            if st.session_state.get('last_download_format') != download_format:
+                st.session_state.zip_buffers = []
+                st.session_state.concatenated_video = None
+                st.session_state.last_download_format = download_format
             
             # Check if concatenation is available
             if download_format == "Single concatenated video file":
                 try:
-                    import moviepy.editor
+                    import imageio_ffmpeg
                     concatenation_available = True
                 except ImportError:
                     concatenation_available = False
-                    st.warning("⚠️ Video concatenation requires MoviePy. Install it to enable this feature:")
-                    st.code("pip install moviepy", language="bash")
+                    st.warning("⚠️ Video concatenation requires imageio-ffmpeg. Install it to enable this feature:")
+                    st.code("pip install imageio-ffmpeg", language="bash")
                     st.info("After installation, restart your Streamlit app.")
             else:
                 concatenation_available = True
@@ -206,25 +218,39 @@ def main():
                             zip_buffer = create_zip_in_memory(batch_df)
                             st.session_state.zip_buffers.append(zip_buffer)
             
-            elif concatenation_available:  # Single concatenated video and MoviePy is available
+            elif download_format == "Ordered videos for manual concatenation":
+                button_text = "📋 Create Ordered Video Collection"
+                if st.button(button_text, type="primary", use_container_width=True):
+                    st.session_state.zip_buffers = []
+                    rows_to_download = results_df.loc[selected_rows.index]
+                    with st.spinner("📋 Creating ordered video collection..."):
+                        ordered_buffer = create_simple_ordered_videos(rows_to_download)
+                        st.session_state.zip_buffers.append(ordered_buffer)
+            
+            elif concatenation_available:  # Single concatenated video and imageio-ffmpeg is available
                 button_text = "🎬 Create Concatenated Video"
                 if st.button(button_text, type="primary", use_container_width=True):
-                    if len(selected_rows) > 20:
-                        st.warning("⚠️ Concatenating many videos may take several minutes and result in a very large file.")
+                    if len(selected_rows) > 25:
+                        st.error("❌ Too many videos selected for concatenation. Please select 25 or fewer videos.")
+                        st.info("💡 Use 'Individual videos' or 'Ordered videos' option for larger collections.")
+                    elif len(selected_rows) > 15:
+                        st.warning("⚠️ Concatenating many videos may take 2-3 minutes.")
+                        st.info("💡 FFmpeg concatenation is much faster than before!")
                     
-                    rows_to_download = results_df.loc[selected_rows.index]
-                    with st.spinner("🎬 Creating concatenated video... This may take a few minutes"):
-                        try:
-                            concatenated_buffer = create_concatenated_video(rows_to_download)
-                            st.session_state.concatenated_video = concatenated_buffer
-                            st.success("🎉 Concatenated video is ready for download!")
-                        except Exception as e:
-                            st.error(f"❌ Error creating concatenated video: {e}")
-                            if "MoviePy is required" in str(e):
-                                st.code("pip install moviepy", language="bash")
-                                st.info("💡 After installing MoviePy, restart your Streamlit app to enable video concatenation.")
-                            else:
-                                st.info("💡 Try using 'Individual videos' option instead, or select fewer plays.")
+                    if len(selected_rows) <= 25:
+                        rows_to_download = results_df.loc[selected_rows.index]
+                        with st.spinner("🎬 Creating concatenated video with FFmpeg..."):
+                            try:
+                                concatenated_buffer = create_concatenated_video(rows_to_download)
+                                st.session_state.concatenated_video = concatenated_buffer
+                                st.success("🎉 Concatenated video is ready for download!")
+                            except Exception as e:
+                                st.error(f"❌ Error creating concatenated video: {e}")
+                                if "imageio-ffmpeg is required" in str(e):
+                                    st.code("pip install imageio-ffmpeg", language="bash")
+                                    st.info("💡 After installing imageio-ffmpeg, restart your Streamlit app to enable video concatenation.")
+                                else:
+                                    st.info("💡 Try using 'Individual videos' or 'Ordered videos' option instead, or select fewer plays.")
 
         # Initialize session state for concatenated video
         if 'concatenated_video' not in st.session_state:
@@ -232,16 +258,27 @@ def main():
 
         # Download buttons section
         if st.session_state.zip_buffers:
-            st.success("🎉 Individual video batches are ready for download!")
-            for i, zip_buffer in enumerate(st.session_state.zip_buffers):
+            if len(st.session_state.zip_buffers) == 1 and download_format == "Ordered videos for manual concatenation":
+                st.success("🎉 Ordered video collection is ready for download!")
                 st.download_button(
-                    label=f"📁 Download Batch {i+1} as .zip File",
-                    data=zip_buffer,
-                    file_name=f"baseballcv_savant_videos_batch_{i+1}_{datetime.now().strftime('%Y%m%d')}.zip",
+                    label="📋 Download Ordered Videos as .zip File",
+                    data=st.session_state.zip_buffers[0],
+                    file_name=f"baseballcv_ordered_videos_{datetime.now().strftime('%Y%m%d')}.zip",
                     mime="application/zip",
-                    key=f"dl_button_{i}",
+                    key="dl_ordered_videos",
                     use_container_width=True
                 )
+            else:
+                st.success("🎉 Individual video batches are ready for download!")
+                for i, zip_buffer in enumerate(st.session_state.zip_buffers):
+                    st.download_button(
+                        label=f"📁 Download Batch {i+1} as .zip File",
+                        data=zip_buffer,
+                        file_name=f"baseballcv_savant_videos_batch_{i+1}_{datetime.now().strftime('%Y%m%d')}.zip",
+                        mime="application/zip",
+                        key=f"dl_button_{i}",
+                        use_container_width=True
+                    )
         elif st.session_state.concatenated_video:
             st.download_button(
                 label="🎬 Download Concatenated Video",
