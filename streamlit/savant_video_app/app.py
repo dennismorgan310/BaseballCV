@@ -17,7 +17,7 @@ def display_header():
     # Logo and motto column
     with col1:
         # Use logo from i.ibb.co hotlink
-        logo_url = "https://data.balldatalab.com/index.php/s/mmiy3NSpjBjDFG4"
+        logo_url = "https://i.ibb.co/jP339csq/logo-old.jpg"
         
         try:
             # Create clickable logo using the direct image URL
