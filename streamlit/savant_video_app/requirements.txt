@@ -1,0 +1,9 @@
+streamlit
+pandas
+requests
+beautifulsoup4
+lxml
+thefuzz
+python-Levenshtein
+yt-dlp
+imageio-ffmpeg
