@@ -6,3 +6,4 @@ lxml
 thefuzz
 python-Levenshtein
 yt-dlp
+moviepy

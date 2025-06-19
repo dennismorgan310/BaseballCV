@@ -70,7 +70,7 @@ class SavantScraper:
         payload = {
             'hfPT': '',
             'hfAB': '',
-            'hfGT': 'R|',  # Regular season only
+            'hfGT': '',  # Season type - will be populated from search params
             'hfPR': '',
             'hfZ': '',
             'hfStadium': '',
@@ -116,10 +116,28 @@ class SavantScraper:
                 payload['game_date_gt'] = values[0]
             elif key == 'game_date_lt':
                 payload['game_date_lt'] = values[0]
+            elif key == 'hfGT':  # Season types
+                payload['hfGT'] = '|'.join(values) + '|'
             elif key == 'hfPT':  # Pitch types
                 payload['hfPT'] = '|'.join(values) + '|'
             elif key == 'hfAB':  # PA results
                 payload['hfAB'] = '|'.join(values) + '|'
+            elif key == 'hfPR':  # Pitch results
+                payload['hfPR'] = '|'.join(values) + '|'
+            elif key == 'hfC':  # Count situations
+                payload['hfC'] = '|'.join(values) + '|'
+            elif key == 'hfOuts':  # Outs
+                payload['hfOuts'] = '|'.join(values) + '|'
+            elif key == 'hfPull':  # Batted ball direction
+                payload['hfPull'] = '|'.join(values) + '|'
+            elif key == 'hfStadium':  # Venues/Stadiums
+                payload['hfStadium'] = '|'.join(values) + '|'
+            elif key == 'hfSit':  # Situations
+                payload['hfSit'] = '|'.join(values) + '|'
+            elif key == 'pitcher_throws':  # Pitcher handedness
+                payload['pitcher_throws'] = values[0]
+            elif key == 'batter_stands':  # Batter handedness
+                payload['batter_stands'] = values[0]
             elif key == 'hfTeam':  # Teams
                 payload['hfTeam'] = '|'.join(values) + '|'
             elif key == 'pitchers_lookup[]':
@@ -153,8 +171,14 @@ class SavantScraper:
         
         print(f"--- DEBUG: Sending Request to Statcast ---")
         print(f"URL: {self.search_api_url}")
-        print(f"Key parameters: hfPT={payload.get('hfPT')}, hfGT={payload.get('hfGT')}, hfSea={payload.get('hfSea')}")
-        print(f"Date range: {payload.get('game_date_gt')} to {payload.get('game_date_lt')}")
+        print(f"Key parameters: hfPT={payload.get('hfPT')}, hfAB={payload.get('hfAB')}, hfPR={payload.get('hfPR')}")
+        print(f"Game filters: hfGT={payload.get('hfGT')}, hfSea={payload.get('hfSea')}")
+        print(f"Game situation: hfC={payload.get('hfC')}, hfOuts={payload.get('hfOuts')}, hfPull={payload.get('hfPull')}")
+        print(f"Venue & Situation: hfStadium={payload.get('hfStadium')}, hfSit={payload.get('hfSit')}")
+        print(f"Handedness: pitcher_throws={payload.get('pitcher_throws')}, batter_stands={payload.get('batter_stands')}")
+        print(f"Player type: player_type={payload.get('player_type')}")
+        print(f"Date range: game_date_gt={payload.get('game_date_gt')}, game_date_lt={payload.get('game_date_lt')}")
+        print(f"Player filters: pitchers_lookup[]={payload.get('pitchers_lookup[]')}")
         
         try:
             response = requests.get(self.search_api_url, params=payload, timeout=90)
