@@ -30,7 +30,7 @@ def display_header():
             # Fallback with clickable emoji if logo fails to load
             st.markdown("""
             <a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; font-size: 48px;">
-            🏀⚾
+            Baseball/CV
             </a>
             """, unsafe_allow_html=True)
         
@@ -44,7 +44,7 @@ def display_header():
     # Title column
     with col2:
         st.markdown("""
-        # ⚾ <a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a> Savant Video & Data Tool
+        # <a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a> Savant Video & Data Tool
         """, unsafe_allow_html=True)
     
     st.markdown("---")
@@ -56,6 +56,123 @@ def display_header():
     Use the sidebar to search for plays by various filters (date, pitch type, player, advanced metrics) 
     or look up specific plays by their identifiers. Selected plays can be downloaded as video files.
     """)
+
+def find_highlights(scraper, search_params, max_results, selected_batters):
+    """
+    Find top 10 highlight plays using stepping algorithm for exit velocity.
+    Steps down from 110+ mph in 5 mph increments until finding 10 plays.
+    Prioritizes: Home Runs > Triples > Doubles > Singles, sorted by distance projected.
+    """
+    target_plays = 10
+    min_exit_velo = 110
+    step_size = 5
+    current_velo = min_exit_velo
+    min_acceptable_velo = 95  # Don't go below 95 mph
+    
+    st.write("**Searching for highlights with smart exit velocity filtering...**")
+    
+    all_plays = []
+    attempts = []
+    
+    # Define PA result priorities (Home Runs > Triples > Doubles > Singles only)
+    allowed_pa_results = ['home_run', 'triple', 'double', 'single']
+    pa_priority = {'home_run': 4, 'triple': 3, 'double': 2, 'single': 1}
+    
+    while len(all_plays) < target_plays and current_velo >= min_acceptable_velo:
+        # Create parameters with current exit velocity filter
+        velo_params = search_params.copy()
+        
+        # Add exit velocity filter using the metric system
+        velo_params['metric_1'] = ['api_h_launch_speed']
+        velo_params['metric_1_gt'] = [current_velo]
+        velo_params['metric_1_lt'] = [130]  # Max reasonable exit velocity
+        
+        st.write(f"Searching for plays with exit velocity >= {current_velo} mph...")
+        
+        try:
+            df = scraper.get_data_by_filters(velo_params, max_results)
+            
+            if not df.empty:
+                # Filter for plays with launch_speed data and valid PA results
+                df_filtered = df[
+                    df['launch_speed'].notna() & 
+                    (df['launch_speed'] >= current_velo) &
+                    df['events'].isin(allowed_pa_results)
+                ].copy()
+                
+                if not df_filtered.empty:
+                    attempts.append({
+                        'min_velo': current_velo,
+                        'plays_found': len(df_filtered),
+                        'avg_velo': df_filtered['launch_speed'].mean()
+                    })
+                    
+                    # Add new plays to our collection (avoid duplicates)
+                    for _, play in df_filtered.iterrows():
+                        if len(all_plays) < target_plays:
+                            # Avoid duplicates by checking play_id
+                            if not any(p.get('play_id') == play.get('play_id') for p in all_plays):
+                                all_plays.append(play.to_dict())
+                    
+                    st.write(f"Found {len(df_filtered)} plays at {current_velo}+ mph (total: {len(all_plays)}/{target_plays})")
+                    
+                    if len(all_plays) >= target_plays:
+                        break
+                else:
+                    st.write(f"No qualifying plays found at {current_velo}+ mph")
+            else:
+                st.write(f"No plays found at {current_velo}+ mph")
+                
+        except Exception as e:
+            st.write(f"Error searching at {current_velo}+ mph: {str(e)}")
+        
+        # Step down velocity
+        current_velo -= step_size
+    
+    if all_plays:
+        # Convert back to DataFrame
+        highlights_df = pd.DataFrame(all_plays)
+        
+        # Create priority score and sort by: PA priority first, then by distance projected (ascending)
+        highlights_df['pa_priority'] = highlights_df['events'].map(pa_priority).fillna(0)
+        
+        # For distance, we want ascending order (shortest distances first as they are typically more impressive line drives)
+        # But we need to handle NaN values in distance
+        highlights_df['distance_score'] = highlights_df.get('hit_distance_sc', 0).fillna(0)
+        
+        # Sort by: PA priority (descending), then distance (ascending for line drives), then exit velocity (descending)
+        highlights_df = highlights_df.sort_values([
+            'pa_priority', 
+            'distance_score', 
+            'launch_speed'
+        ], ascending=[False, True, False]).head(target_plays)
+        
+        # Remove scoring columns for display
+        highlights_df = highlights_df.drop(['pa_priority', 'distance_score'], axis=1, errors='ignore')
+        
+        # Display search summary with PA result breakdown
+        pa_counts = highlights_df['events'].value_counts()
+        pa_summary = []
+        for pa_result in ['home_run', 'triple', 'double', 'single']:
+            if pa_result in pa_counts:
+                count = pa_counts[pa_result]
+                pa_name = pa_result.replace('_', ' ').title()
+                pa_summary.append(f"{count} {pa_name}{'s' if count != 1 else ''}")
+        
+        st.success(f"**Found {len(highlights_df)} highlight plays for {', '.join(selected_batters)}** ({', '.join(pa_summary)})")
+        
+        if attempts:
+            st.info(f"**Search Summary:** Found plays with exit velocity from {max(attempts[-1]['min_velo'], min_acceptable_velo)}+ to {attempts[0]['min_velo']}+ mph")
+            
+            # Show velocity breakdown
+            for attempt in attempts[:3]:  # Show top 3 velocity ranges
+                st.write(f"• {attempt['plays_found']} plays at {attempt['min_velo']}+ mph (avg: {attempt['avg_velo']:.1f} mph)")
+        
+        return highlights_df
+    else:
+        st.warning(f"No highlight plays found for {', '.join(selected_batters)} in the selected date range.")
+        st.info("Try expanding the date range or selecting different batters. Only Home Runs, Triples, Doubles, and Singles with 95+ mph exit velocity qualify as highlights.")
+        return pd.DataFrame()
 
 def main():
     """
@@ -85,7 +202,7 @@ def main():
         st.session_state.last_download_format = None
 
     # --- Search Logic ---
-    search_pressed = st.sidebar.button("🔍 Search", type="primary", use_container_width=True)
+    search_pressed = st.sidebar.button("Search", type="primary", use_container_width=True)
     perform_search = False
 
     if search_pressed:
@@ -93,28 +210,41 @@ def main():
         st.session_state.results_df = pd.DataFrame()
         st.session_state.zip_buffers = []
         st.session_state.concatenated_video = None
+        
         if query_mode == 'filters':
             _, _, start_date, end_date = params
             if (end_date - start_date) > timedelta(days=5):
                 st.session_state.show_date_warning = True
             else:
                 perform_search = True
+        elif query_mode == 'highlights':
+            # For highlights, check if batters are selected
+            if params and len(params) > 4 and params[4]:  # params[4] contains selected_batters
+                perform_search = True
+            else:
+                st.sidebar.error("Please select at least one batter for highlights mode")
         else: # For play_id search, no warning needed
             perform_search = True
 
     if st.session_state.get('show_date_warning'):
-        st.sidebar.warning("⚠️ Large date range selected. This may be slow.")
+        st.sidebar.warning("Large date range selected. This may be slow.")
         if st.sidebar.button("Proceed Anyway", use_container_width=True):
             st.session_state.show_date_warning = False
             perform_search = True
 
     if perform_search:
-        with st.spinner("🔍 Fetching data from Baseball Savant... (This may take a moment)"):
+        with st.spinner("Fetching data from Baseball Savant... (This may take a moment)"):
             scraper = SavantScraper()
             try:
                 if query_mode == 'filters':
                     search_params, max_results, _, _ = params
                     st.session_state.results_df = scraper.get_data_by_filters(search_params, max_results)
+                elif query_mode == 'highlights':
+                    search_params, max_results, _, _, selected_batters = params
+                    if search_params and selected_batters:
+                        st.session_state.results_df = find_highlights(scraper, search_params, max_results, selected_batters)
+                    else:
+                        st.warning("Please select at least one batter for highlights mode.")
                 elif query_mode == 'play_id':
                     game_pk, at_bat, pitch, _, _ = params
                     if all([game_pk, at_bat, pitch]):
@@ -126,7 +256,15 @@ def main():
 
     # --- Display and Download Logic ---
     if not st.session_state.get('results_df', pd.DataFrame()).empty:
-        st.subheader("📊 Search Results")
+        # Check if this was a highlights search
+        if query_mode == 'highlights':
+            st.subheader("Highlights Results")
+            if len(params) > 4 and params[4]:  # Check if selected_batters exists
+                selected_batters = params[4]
+                st.info(f"**Highlights for:** {', '.join(selected_batters)} • **{len(st.session_state.results_df)} plays found**")
+        else:
+            st.subheader("Search Results")
+        
         results_df = st.session_state.results_df.copy()
 
         # Data Prep
@@ -151,8 +289,16 @@ def main():
         existing_display_cols = [col for col in display_columns if col in results_df.columns]
         df_for_display = results_df[existing_display_cols].copy()
         
-        # Results summary
-        st.info(f"📈 Found **{len(df_for_display)}** plays matching your search criteria")
+        # Results summary - special handling for highlights mode
+        if query_mode == 'highlights':
+            if 'launch_speed' in results_df.columns:
+                avg_exit_velo = results_df['launch_speed'].mean()
+                max_exit_velo = results_df['launch_speed'].max()
+                st.success(f"Found **{len(df_for_display)} highlight plays** • Avg Exit Velocity: **{avg_exit_velo:.1f} mph** • Max: **{max_exit_velo:.1f} mph**")
+            else:
+                st.success(f"Found **{len(df_for_display)} highlight plays**")
+        else:
+            st.info(f"Found **{len(df_for_display)}** plays matching your search criteria")
         
         st.checkbox("Select All / Deselect All", key="select_all")
         df_for_display.insert(0, "Select", st.session_state.select_all)
@@ -167,10 +313,10 @@ def main():
         
         selected_rows = edited_df[edited_df.Select]
         
-        st.subheader("📥 Download Options")
+        st.subheader("Download Options")
         
         if not selected_rows.empty:
-            st.success(f"✅ **{len(selected_rows)} play(s)** selected for download")
+            st.success(f"**{len(selected_rows)} play(s)** selected for download")
             
             # Download format selection
             download_format = st.radio(
@@ -197,60 +343,61 @@ def main():
                     concatenation_available = True
                 except ImportError:
                     concatenation_available = False
-                    st.warning("⚠️ Video concatenation requires imageio-ffmpeg. Install it to enable this feature:")
+                    st.warning("Video concatenation requires imageio-ffmpeg. Install it to enable this feature:")
                     st.code("pip install imageio-ffmpeg", language="bash")
                     st.info("After installation, restart your Streamlit app.")
             else:
                 concatenation_available = True
             
             if download_format == "Individual videos in zip file":
-                button_text = "🎥 Prepare Individual Videos for Download"
+                button_text = "Prepare Individual Videos for Download"
                 if st.button(button_text, type="primary", use_container_width=True):
                     st.session_state.zip_buffers = []
                     BATCH_SIZE = 50
                     if len(selected_rows) > BATCH_SIZE:
-                        st.warning(f"📦 Preparing {len(selected_rows)} videos in batches of {BATCH_SIZE}. Please download each zip file as it becomes available.")
+                        st.warning(f"Preparing {len(selected_rows)} videos in batches of {BATCH_SIZE}. Please download each zip file as it becomes available.")
                     rows_to_download = results_df.loc[selected_rows.index]
                     list_df = [rows_to_download.iloc[i:i+BATCH_SIZE] for i in range(0, len(rows_to_download), BATCH_SIZE)]
                     
                     for i, batch_df in enumerate(list_df):
-                        with st.spinner(f"📦 Preparing zip file for batch {i+1}/{len(list_df)}..."):
+                        with st.spinner(f"Preparing zip file for batch {i+1}/{len(list_df)}..."):
                             zip_buffer = create_zip_in_memory(batch_df)
                             st.session_state.zip_buffers.append(zip_buffer)
             
             elif download_format == "Ordered videos for manual concatenation":
-                button_text = "📋 Create Ordered Video Collection"
+                button_text = "Create Ordered Video Collection"
                 if st.button(button_text, type="primary", use_container_width=True):
                     st.session_state.zip_buffers = []
                     rows_to_download = results_df.loc[selected_rows.index]
-                    with st.spinner("📋 Creating ordered video collection..."):
+                    with st.spinner("Creating ordered video collection..."):
                         ordered_buffer = create_simple_ordered_videos(rows_to_download)
                         st.session_state.zip_buffers.append(ordered_buffer)
             
             elif concatenation_available:  # Single concatenated video and imageio-ffmpeg is available
-                button_text = "🎬 Create Concatenated Video"
+                button_text = "Create Concatenated Video"
                 if st.button(button_text, type="primary", use_container_width=True):
                     if len(selected_rows) > 25:
-                        st.error("❌ Too many videos selected for concatenation. Please select 25 or fewer videos.")
-                        st.info("💡 Use 'Individual videos' or 'Ordered videos' option for larger collections.")
+                        st.error("Too many videos selected for concatenation. Please select 25 or fewer videos.")
+                        st.info("Use 'Individual videos' or 'Ordered videos' option for larger collections.")
                     elif len(selected_rows) > 15:
-                        st.warning("⚠️ Concatenating many videos may take 2-3 minutes.")
-                        st.info("💡 FFmpeg concatenation is much faster than before!")
+                        st.warning("Concatenating many videos may take 2-3 minutes.")
+                        st.info("FFmpeg concatenation is much faster than before!")
                     
                     if len(selected_rows) <= 25:
                         rows_to_download = results_df.loc[selected_rows.index]
-                        with st.spinner("🎬 Creating concatenated video with FFmpeg..."):
+                        with st.spinner("Creating concatenated video with FFmpeg..."):
                             try:
                                 concatenated_buffer = create_concatenated_video(rows_to_download)
                                 st.session_state.concatenated_video = concatenated_buffer
-                                st.success("🎉 Concatenated video is ready for download!")
+                                st.success("Concatenated video is ready for download!")
                             except Exception as e:
-                                st.error(f"❌ Error creating concatenated video: {e}")
+                                st.error(f"Error creating concatenated video: {e}")
                                 if "imageio-ffmpeg is required" in str(e):
                                     st.code("pip install imageio-ffmpeg", language="bash")
-                                    st.info("💡 After installing imageio-ffmpeg, restart your Streamlit app to enable video concatenation.")
+                                    st.info("After installing imageio-ffmpeg, restart your Streamlit app to enable video concatenation.")
                                 else:
-                                    st.info("💡 Try using 'Individual videos' or 'Ordered videos' option instead, or select fewer plays.")
+                                    st.info("Try using 'Individual videos' or 'Ordered videos' option instead, or select fewer plays.")
+
 
         # Initialize session state for concatenated video
         if 'concatenated_video' not in st.session_state:
@@ -259,9 +406,9 @@ def main():
         # Download buttons section
         if st.session_state.zip_buffers:
             if len(st.session_state.zip_buffers) == 1 and download_format == "Ordered videos for manual concatenation":
-                st.success("🎉 Ordered video collection is ready for download!")
+                st.success("Ordered video collection is ready for download!")
                 st.download_button(
-                    label="📋 Download Ordered Videos as .zip File",
+                    label="Download Ordered Videos as .zip File",
                     data=st.session_state.zip_buffers[0],
                     file_name=f"baseballcv_ordered_videos_{datetime.now().strftime('%Y%m%d')}.zip",
                     mime="application/zip",
@@ -269,10 +416,10 @@ def main():
                     use_container_width=True
                 )
             else:
-                st.success("🎉 Individual video batches are ready for download!")
+                st.success("Individual video batches are ready for download!")
                 for i, zip_buffer in enumerate(st.session_state.zip_buffers):
                     st.download_button(
-                        label=f"📁 Download Batch {i+1} as .zip File",
+                        label=f"Download Batch {i+1} as .zip File",
                         data=zip_buffer,
                         file_name=f"baseballcv_savant_videos_batch_{i+1}_{datetime.now().strftime('%Y%m%d')}.zip",
                         mime="application/zip",
@@ -281,7 +428,7 @@ def main():
                     )
         elif st.session_state.concatenated_video:
             st.download_button(
-                label="🎬 Download Concatenated Video",
+                label="Download Concatenated Video",
                 data=st.session_state.concatenated_video,
                 file_name=f"baseballcv_concatenated_plays_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
                 mime="video/mp4",
@@ -289,15 +436,15 @@ def main():
                 use_container_width=True
             )
         elif not selected_rows.empty:
-             st.info("👆 Choose your download format and click the button to begin.")
+             st.info("Choose your download format and click the button to begin.")
         else:
-            st.info("☝️ Select one or more plays to prepare for download.")
+            st.info("Select one or more plays to prepare for download.")
 
         # CSV download with branding
         st.markdown("---")
-        st.subheader("📊 Export Data")
+        st.subheader("Export Data")
         st.download_button(
-            "📄 Download Full Search Results as CSV", 
+            "Download Full Search Results as CSV", 
             results_df.to_csv(index=False).encode('utf-8'), 
             f"baseballcv_savant_search_results_{datetime.now().strftime('%Y%m%d')}.csv", 
             "text/csv", 
@@ -306,7 +453,7 @@ def main():
         )
 
     else:
-        st.info("👈 Use the sidebar to search for Baseball Savant data and see results here.")
+        st.info("Use the sidebar to search for Baseball Savant data and see results here.")
     
     # Footer with BaseballCV info
     st.markdown("---")

@@ -140,10 +140,6 @@ class SavantScraper:
                 payload['batter_stands'] = values[0]
             elif key == 'hfTeam':  # Teams
                 payload['hfTeam'] = '|'.join(values) + '|'
-            elif key == 'pitchers_lookup[]':
-                payload['pitchers_lookup[]'] = '|'.join(map(str, values))
-            elif key == 'batters_lookup[]':
-                payload['batters_lookup[]'] = '|'.join(map(str, values))
             elif key == 'player_type':
                 payload['player_type'] = values[0]
             elif key.startswith('metric_'):
@@ -153,14 +149,14 @@ class SavantScraper:
         # Set max results
         payload['h_max'] = str(max_results)
         
-        return payload
+        return payload, search_params.get('pitchers_lookup[]'), search_params.get('batters_lookup[]')
 
     def get_data_by_filters(self, search_params: dict, max_results: int = 50) -> pd.DataFrame:
         """
         Fetches and processes Statcast data for a set of search filters.
         """
         # Format payload to match Baseball Savant's expected format
-        payload = self._format_savant_payload(search_params, max_results)
+        payload, pitcher_ids, batter_ids = self._format_savant_payload(search_params, max_results)
         
         # Debug output for metric parameters
         metric_params = {k: v for k, v in payload.items() if k.startswith('metric_')}
@@ -178,10 +174,27 @@ class SavantScraper:
         print(f"Handedness: pitcher_throws={payload.get('pitcher_throws')}, batter_stands={payload.get('batter_stands')}")
         print(f"Player type: player_type={payload.get('player_type')}")
         print(f"Date range: game_date_gt={payload.get('game_date_gt')}, game_date_lt={payload.get('game_date_lt')}")
-        print(f"Player filters: pitchers_lookup[]={payload.get('pitchers_lookup[]')}")
+        print(f"Pitcher IDs: {pitcher_ids}")
+        print(f"Batter IDs: {batter_ids}")
         
         try:
-            response = requests.get(self.search_api_url, params=payload, timeout=90)
+            # Prepare the request
+            # For multiple players, we need to add them as separate parameters
+            params = []
+            for key, value in payload.items():
+                params.append((key, value))
+            
+            # Add pitcher lookups if present
+            if pitcher_ids:
+                for pitcher_id in pitcher_ids:
+                    params.append(('pitchers_lookup[]', str(pitcher_id)))
+            
+            # Add batter lookups if present  
+            if batter_ids:
+                for batter_id in batter_ids:
+                    params.append(('batters_lookup[]', str(batter_id)))
+            
+            response = requests.get(self.search_api_url, params=params, timeout=90)
             response.raise_for_status()
             
             csv_content = response.text.strip()
