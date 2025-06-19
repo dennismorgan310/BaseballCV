@@ -226,7 +226,6 @@ def main():
                             else:
                                 st.info("💡 Try using 'Individual videos' option instead, or select fewer plays.")
 
-
         # Initialize session state for concatenated video
         if 'concatenated_video' not in st.session_state:
             st.session_state.concatenated_video = None
