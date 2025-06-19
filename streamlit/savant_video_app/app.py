@@ -3,7 +3,7 @@ import pandas as pd
 from app_utils.ui_components import display_search_interface
 from app_utils.savant_scraper import SavantScraper
 from app_utils.player_lookup import load_player_id_map
-from app_utils.downloader import create_zip_in_memory
+from app_utils.downloader import create_zip_in_memory, create_concatenated_video
 import os
 from datetime import datetime, timedelta
 
@@ -79,6 +79,8 @@ def main():
         st.session_state.results_df = pd.DataFrame()
     if 'zip_buffers' not in st.session_state:
         st.session_state.zip_buffers = []
+    if 'concatenated_video' not in st.session_state:
+        st.session_state.concatenated_video = None
 
     # --- Search Logic ---
     search_pressed = st.sidebar.button("🔍 Search", type="primary", use_container_width=True)
@@ -88,6 +90,7 @@ def main():
         # Clear previous search results and download states on new search
         st.session_state.results_df = pd.DataFrame()
         st.session_state.zip_buffers = []
+        st.session_state.concatenated_video = None
         if query_mode == 'filters':
             _, _, start_date, end_date = params
             if (end_date - start_date) > timedelta(days=5):
@@ -166,21 +169,71 @@ def main():
         
         if not selected_rows.empty:
             st.success(f"✅ **{len(selected_rows)} play(s)** selected for download")
-            if st.button("🎥 Prepare Videos for Download", type="primary", use_container_width=True):
-                st.session_state.zip_buffers = []
-                BATCH_SIZE = 50
-                if len(selected_rows) > BATCH_SIZE:
-                    st.warning(f"📦 Preparing {len(selected_rows)} videos in batches of {BATCH_SIZE}. Please download each zip file as it becomes available.")
-                rows_to_download = results_df.loc[selected_rows.index]
-                list_df = [rows_to_download.iloc[i:i+BATCH_SIZE] for i in range(0, len(rows_to_download), BATCH_SIZE)]
-                
-                for i, batch_df in enumerate(list_df):
-                    with st.spinner(f"📦 Preparing zip file for batch {i+1}/{len(list_df)}..."):
-                        zip_buffer = create_zip_in_memory(batch_df)
-                        st.session_state.zip_buffers.append(zip_buffer)
+            
+            # Download format selection
+            download_format = st.radio(
+                "Choose download format:",
+                options=["Individual videos in zip file", "Single concatenated video file"],
+                index=0,
+                help="Individual videos: Each play as a separate MP4 file in a zip archive. Concatenated: All plays joined into one continuous video file."
+            )
+            
+            # Check if concatenation is available
+            if download_format == "Single concatenated video file":
+                try:
+                    import moviepy.editor
+                    concatenation_available = True
+                except ImportError:
+                    concatenation_available = False
+                    st.warning("⚠️ Video concatenation requires MoviePy. Install it to enable this feature:")
+                    st.code("pip install moviepy", language="bash")
+                    st.info("After installation, restart your Streamlit app.")
+            else:
+                concatenation_available = True
+            
+            if download_format == "Individual videos in zip file":
+                button_text = "🎥 Prepare Individual Videos for Download"
+                if st.button(button_text, type="primary", use_container_width=True):
+                    st.session_state.zip_buffers = []
+                    BATCH_SIZE = 50
+                    if len(selected_rows) > BATCH_SIZE:
+                        st.warning(f"📦 Preparing {len(selected_rows)} videos in batches of {BATCH_SIZE}. Please download each zip file as it becomes available.")
+                    rows_to_download = results_df.loc[selected_rows.index]
+                    list_df = [rows_to_download.iloc[i:i+BATCH_SIZE] for i in range(0, len(rows_to_download), BATCH_SIZE)]
+                    
+                    for i, batch_df in enumerate(list_df):
+                        with st.spinner(f"📦 Preparing zip file for batch {i+1}/{len(list_df)}..."):
+                            zip_buffer = create_zip_in_memory(batch_df)
+                            st.session_state.zip_buffers.append(zip_buffer)
+            
+            elif concatenation_available:  # Single concatenated video and MoviePy is available
+                button_text = "🎬 Create Concatenated Video"
+                if st.button(button_text, type="primary", use_container_width=True):
+                    if len(selected_rows) > 20:
+                        st.warning("⚠️ Concatenating many videos may take several minutes and result in a very large file.")
+                    
+                    rows_to_download = results_df.loc[selected_rows.index]
+                    with st.spinner("🎬 Creating concatenated video... This may take a few minutes"):
+                        try:
+                            concatenated_buffer = create_concatenated_video(rows_to_download)
+                            st.session_state.concatenated_video = concatenated_buffer
+                            st.success("🎉 Concatenated video is ready for download!")
+                        except Exception as e:
+                            st.error(f"❌ Error creating concatenated video: {e}")
+                            if "MoviePy is required" in str(e):
+                                st.code("pip install moviepy", language="bash")
+                                st.info("💡 After installing MoviePy, restart your Streamlit app to enable video concatenation.")
+                            else:
+                                st.info("💡 Try using 'Individual videos' option instead, or select fewer plays.")
 
+
+        # Initialize session state for concatenated video
+        if 'concatenated_video' not in st.session_state:
+            st.session_state.concatenated_video = None
+
+        # Download buttons section
         if st.session_state.zip_buffers:
-            st.success("🎉 All batches are ready for download!")
+            st.success("🎉 Individual video batches are ready for download!")
             for i, zip_buffer in enumerate(st.session_state.zip_buffers):
                 st.download_button(
                     label=f"📁 Download Batch {i+1} as .zip File",
@@ -190,8 +243,17 @@ def main():
                     key=f"dl_button_{i}",
                     use_container_width=True
                 )
+        elif st.session_state.concatenated_video:
+            st.download_button(
+                label="🎬 Download Concatenated Video",
+                data=st.session_state.concatenated_video,
+                file_name=f"baseballcv_concatenated_plays_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                mime="video/mp4",
+                key="dl_concatenated_video",
+                use_container_width=True
+            )
         elif not selected_rows.empty:
-             st.info("👆 Click 'Prepare Videos' to begin downloading.")
+             st.info("👆 Choose your download format and click the button to begin.")
         else:
             st.info("☝️ Select one or more plays to prepare for download.")
 
@@ -215,7 +277,7 @@ def main():
     st.markdown("""
     <div style='text-align: center; color: #666; padding: 20px;'>
         <small>
-        ⚾ <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
+        🏀⚾ <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
         Built with Streamlit • Data from Baseball Savant • Videos from MLB
         </small>
     </div>
