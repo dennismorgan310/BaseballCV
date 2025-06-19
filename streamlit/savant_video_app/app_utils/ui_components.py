@@ -216,11 +216,73 @@ METRIC_FILTERS = {
 
 def display_search_interface(player_df):
     st.sidebar.header("Search Options")
-    query_mode = st.sidebar.radio("Query Mode", ('Search by Filters', 'Search by Specific Play ID'))
-    if query_mode == 'Search by Filters':
+    
+    # Initialize search mode in session state
+    if 'search_mode' not in st.session_state:
+        st.session_state.search_mode = 'filters'
+    
+    # Highlights mode - prominent button at top
+    st.sidebar.markdown("### Quick Highlights")
+    if st.sidebar.button("Find Highlights", type="primary", use_container_width=True, help="Automatically find the top 10 hardest hit balls (home runs prioritized) for selected batter(s). Steps down from 110+ mph exit velocity until finding 10 plays."):
+        st.session_state.search_mode = 'highlights'
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Advanced Search")
+    
+    # Mode selection buttons
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("Filter Search", use_container_width=True, type="secondary" if st.session_state.search_mode != 'filters' else "primary"):
+            st.session_state.search_mode = 'filters'
+    with col2:
+        if st.button("Play ID Search", use_container_width=True, type="secondary" if st.session_state.search_mode != 'play_id' else "primary"):
+            st.session_state.search_mode = 'play_id'
+    
+    # Return appropriate interface based on mode
+    if st.session_state.search_mode == 'highlights':
+        return 'highlights', display_highlights_search(player_df)
+    elif st.session_state.search_mode == 'filters':
         return 'filters', display_search_filters(player_df)
     else:
         return 'play_id', display_play_id_search()
+
+def display_highlights_search(player_df):
+    """Display simplified interface for highlights mode"""
+    params = {}
+    player_names = sorted(player_df['name'].unique()) if not player_df.empty else []
+
+    st.sidebar.markdown("##### Date Range")
+    today = datetime.date.today()
+    default_start = today - datetime.timedelta(days=7)  # Default to last week for highlights
+    start_date = st.sidebar.date_input("Start Date", default_start, key="highlights_start")
+    end_date = st.sidebar.date_input("End Date", today, key="highlights_end")
+    
+    st.sidebar.markdown("##### Select Batter(s)")
+    selected_batters = st.sidebar.multiselect("Batter(s) for Highlights", player_names, key="highlights_batters")
+    
+    # Add explanation of highlights mode
+    st.sidebar.info("**Highlights Mode:** Finds the top 10 hardest hit balls (starting at 110+ mph exit velocity, stepping down by 5 mph until 10 plays are found). Home runs are prioritized.")
+    
+    if not selected_batters:
+        st.sidebar.warning("Please select at least one batter to find highlights")
+        return None, None, start_date, end_date, None
+    
+    batter_ids = [int(player_df[player_df['name'] == name].iloc[0]['id']) for name in selected_batters]
+    
+    # Auto-configure search parameters for highlights
+    params['game_date_gt'] = [start_date.strftime('%Y-%m-%d')]
+    params['game_date_lt'] = [end_date.strftime('%Y-%m-%d')]
+    params['batters_lookup[]'] = batter_ids
+    params['hfGT'] = ['R']  # Regular season only
+    params['hfSea'] = [str(datetime.datetime.now().year)]
+    params['player_type'] = ['batter']
+    
+    # Set pitch result for highlights (hit into play - this covers all batted balls including home runs)
+    params['hfPR'] = ['hit_into_play']  # Pitch result: hit into play (covers all contact)
+    
+    max_results = 200  # Get more results to filter through
+    
+    return params, max_results, start_date, end_date, selected_batters
 
 def display_search_filters(player_df):
     params = {}
