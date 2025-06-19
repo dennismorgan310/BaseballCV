@@ -17,7 +17,7 @@ def display_header():
     # Logo and motto column
     with col1:
         # Use logo from i.ibb.co hotlink
-        logo_url = "https://i.ibb.co/jP339csq/logo-old.jpg"
+        logo_url = "https://data.balldatalab.com/index.php/s/mmiy3NSpjBjDFG4"
         
         try:
             # Create clickable logo using the direct image URL
@@ -313,7 +313,7 @@ def main():
     st.markdown("""
     <div style='text-align: center; color: #666; padding: 20px;'>
         <small>
-        🏀⚾ <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
+        <strong><a href="https://github.com/BaseballCV" target="_blank" style="text-decoration: none; color: inherit;">BaseballCV</a></strong> - A collection of tools and models designed to aid in the use of Computer Vision in baseball.<br>
         Built with Streamlit • Data from Baseball Savant • Videos from MLB
         </small>
     </div>
