@@ -300,10 +300,10 @@ def display_highlights_search(player_df):
         params['hfPR'] = ['hit_into_play']
     else:  # pitcher
         params['pitchers_lookup[]'] = player_ids
-        # Set specific parameters for pitcher highlights
+        # Set specific parameters for pitcher highlights to match Baseball Savant exactly
         params['hfAB'] = ['strikeout']  # PA result: strikeouts only
         params['hfPR'] = ['swinging_strike', 'called_strike']  # Pitch result: swinging or called strikes
-        params['hfC'] = ['02', '12', '22', '32']  # Count: any count with 2 strikes
+        params['hfC'] = ['2strikes']  # Count: any count with 2 strikes (use Baseball Savant's format)
     
     max_results = 200  # Get more results to filter through
     
@@ -435,4 +435,4 @@ def display_play_id_search():
     game_pk = st.sidebar.number_input("Game PK", step=1, value=None)
     at_bat_number = st.sidebar.number_input("At Bat Number", step=1, value=None)
     pitch_number = st.sidebar.number_input("Pitch Number", step=1, value=None)
-    return game_pk, at_bat_number, pitch_number, None, None     
+    return game_pk, at_bat_number, pitch_number, None, None
