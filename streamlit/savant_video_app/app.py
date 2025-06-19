@@ -177,76 +177,60 @@ def find_batter_highlights(scraper, search_params, max_results, selected_players
 def find_pitcher_highlights(scraper, search_params, max_results, selected_players):
     """
     Find top 10 pitcher highlight plays - strikeouts with 2 strikes in the count.
-    Looks for swinging strikes or called strikes that resulted in strikeouts.
-    Sorted by most recent.
+    Baseball Savant does the filtering server-side, so we just need to sort and limit results.
     """
     target_plays = 10
     
     st.write("**Searching for pitcher highlights - strikeouts with 2 strikes...**")
-    st.write(f"DEBUG: find_pitcher_highlights called with:")
-    st.write(f"DEBUG: scraper = {scraper}")
-    st.write(f"DEBUG: search_params = {search_params}")
-    st.write(f"DEBUG: max_results = {max_results}")
-    st.write(f"DEBUG: selected_players = {selected_players}")
     
     try:
-        st.write("DEBUG: About to call scraper.get_data_by_filters")
         df = scraper.get_data_by_filters(search_params, max_results)
-        st.write(f"DEBUG: scraper.get_data_by_filters returned successfully, df shape: {df.shape}")
         
         if not df.empty:
-            st.write(f"Found {len(df)} potential strikeout pitches")
+            st.write(f"Found {len(df)} strikeout pitches with 2 strikes")
             
-            # Additional filtering to ensure we have the exact criteria
-            df_filtered = df[
-                (df['events'] == 'strikeout') &  # PA result must be strikeout
-                df['description'].isin(['swinging_strike', 'called_strike']) &  # Pitch result
-                df['strikes'] == 2  # Must have 2 strikes in the count
-            ].copy()
+            # Since Baseball Savant already filtered correctly, we just need to sort by most recent and limit
+            sort_columns = ['game_date', 'game_pk', 'inning', 'at_bat_number', 'pitch_number']
+            existing_sort_cols = [col for col in sort_columns if col in df.columns]
             
-            if not df_filtered.empty:
-                # Sort by most recent: game_date desc, then game_pk desc, then inning desc, then at_bat desc, then pitch desc
-                sort_columns = ['game_date', 'game_pk', 'inning', 'at_bat_number', 'pitch_number']
-                existing_sort_cols = [col for col in sort_columns if col in df_filtered.columns]
-                
-                if existing_sort_cols:
-                    df_filtered = df_filtered.sort_values(by=existing_sort_cols, ascending=False)
-                
-                # Take the most recent target_plays
-                highlights_df = df_filtered.head(target_plays)
-                
-                # Create pitch type summary
+            if existing_sort_cols:
+                df = df.sort_values(by=existing_sort_cols, ascending=False)
+            
+            # Take the most recent target_plays
+            highlights_df = df.head(target_plays)
+            
+            # Create pitch type summary
+            if 'pitch_type' in highlights_df.columns:
                 pitch_types = highlights_df['pitch_type'].value_counts()
                 pitch_summary = []
                 for pitch_type, count in pitch_types.items():
                     pitch_summary.append(f"{count} {pitch_type}")
-                
-                # Create description summary (swinging vs called)
+            else:
+                pitch_summary = []
+            
+            # Create description summary (swinging vs called)
+            if 'description' in highlights_df.columns:
                 description_counts = highlights_df['description'].value_counts()
                 desc_summary = []
                 for desc, count in description_counts.items():
                     desc_name = desc.replace('_', ' ').title()
                     desc_summary.append(f"{count} {desc_name}{'s' if count != 1 else ''}")
-                
-                st.success(f"**Found {len(highlights_df)} pitcher highlight plays for {', '.join(selected_players)}** ({', '.join(desc_summary)})")
-                
-                if pitch_summary:
-                    st.info(f"**Pitch Types:** {', '.join(pitch_summary)}")
-                
-                return highlights_df
             else:
-                st.warning(f"No strikeout pitches with 2 strikes found for {', '.join(selected_players)} in the selected date range.")
-                st.info("Try expanding the date range or selecting different pitchers.")
-                return pd.DataFrame()
+                desc_summary = ["strikeout pitches"]
+            
+            st.success(f"**Found {len(highlights_df)} pitcher highlight plays for {', '.join(selected_players)}** ({', '.join(desc_summary)})")
+            
+            if pitch_summary:
+                st.info(f"**Pitch Types:** {', '.join(pitch_summary)}")
+            
+            return highlights_df
         else:
-            st.warning(f"No plays found for {', '.join(selected_players)} in the selected date range.")
+            st.warning(f"No strikeout pitches with 2 strikes found for {', '.join(selected_players)} in the selected date range.")
+            st.info("Try expanding the date range or selecting different pitchers.")
             return pd.DataFrame()
             
     except Exception as e:
-        st.error(f"Error in find_pitcher_highlights: {str(e)}")
-        import traceback
-        st.write("DEBUG: Full traceback in find_pitcher_highlights:")
-        st.code(traceback.format_exc())
+        st.error(f"Error searching for pitcher highlights: {str(e)}")
         return pd.DataFrame()
 
 def main():
@@ -281,51 +265,33 @@ def main():
     perform_search = False
 
     if search_pressed:
-        st.write(f"DEBUG: Search button pressed")
-        st.write(f"DEBUG: query_mode = {query_mode}")
-        st.write(f"DEBUG: params = {params}")
-        st.write(f"DEBUG: params length = {len(params) if params else 'None'}")
-        
         # Clear previous search results and download states on new search
         st.session_state.results_df = pd.DataFrame()
         st.session_state.zip_buffers = []
         st.session_state.concatenated_video = None
         
-        try:
-            if query_mode == 'filters':
-                st.write("DEBUG: Processing filters logic")
-                # filters mode: params, max_results, start_date, end_date
-                if params and len(params) >= 4:
-                    st.write("DEBUG: About to unpack filters params")
-                    search_params, max_results, start_date, end_date = params[0], params[1], params[2], params[3]
-                    if (end_date - start_date) > timedelta(days=5):
-                        st.session_state.show_date_warning = True
-                    else:
-                        perform_search = True
+        if query_mode == 'filters':
+            # filters mode: params, max_results, start_date, end_date
+            if params and len(params) >= 4:
+                search_params, max_results, start_date, end_date = params[0], params[1], params[2], params[3]
+                if (end_date - start_date) > timedelta(days=5):
+                    st.session_state.show_date_warning = True
                 else:
-                    st.sidebar.error("Invalid filter parameters")
-            elif query_mode == 'highlights':
-                st.write("DEBUG: Processing highlights logic")
-                # highlights mode: params, max_results, start_date, end_date, selected_players, highlights_type
-                if params and len(params) >= 6 and params[4]:  # Check if selected_players exists
-                    st.write("DEBUG: Highlights params look good")
                     perform_search = True
-                else:
-                    st.sidebar.error("Please select at least one player for highlights mode")
-            elif query_mode == 'play_id':
-                st.write("DEBUG: Processing play_id logic")
-                # play_id mode: game_pk, at_bat_number, pitch_number, None, None
-                if params and len(params) >= 5 and all(params[:3]):
-                    perform_search = True
-                else:
-                    st.sidebar.error("Please provide all three Play ID values")
             else:
-                st.sidebar.error("Unknown search mode")
-        except Exception as e:
-            st.error(f"Error in search button logic: {e}")
-            import traceback
-            st.write("DEBUG: Traceback in search button logic:")
-            st.code(traceback.format_exc())
+                st.sidebar.error("Invalid filter parameters")
+        elif query_mode == 'highlights':
+            # highlights mode: params, max_results, start_date, end_date, selected_players, highlights_type
+            if params and len(params) >= 6 and params[4]:  # Check if selected_players exists
+                perform_search = True
+            else:
+                st.sidebar.error("Please select at least one player for highlights mode")
+        elif query_mode == 'play_id':
+            # play_id mode: game_pk, at_bat_number, pitch_number, None, None
+            if params and len(params) >= 5 and all(params[:3]):
+                perform_search = True
+            else:
+                st.sidebar.error("Please provide all three Play ID values")
 
     if st.session_state.get('show_date_warning'):
         st.sidebar.warning("Large date range selected. This may be slow.")
@@ -338,16 +304,24 @@ def main():
             scraper = SavantScraper()
             try:
                 if query_mode == 'filters':
-                    search_params, max_results, _, _ = params
+                    search_params, max_results = params[0], params[1]
                     st.session_state.results_df = scraper.get_data_by_filters(search_params, max_results)
                 elif query_mode == 'highlights':
-                    search_params, max_results, _, _, selected_batters = params
-                    if search_params and selected_batters:
-                        st.session_state.results_df = find_highlights(scraper, search_params, max_results, selected_batters)
+                    # Extract each value explicitly from the 6-value tuple
+                    search_params = params[0]
+                    max_results = params[1] 
+                    selected_players = params[4]
+                    highlights_type = params[5]
+                    
+                    if search_params and selected_players:
+                        if highlights_type == "Batter Highlights":
+                            st.session_state.results_df = find_batter_highlights(scraper, search_params, max_results, selected_players)
+                        else:  # Pitcher Highlights
+                            st.session_state.results_df = find_pitcher_highlights(scraper, search_params, max_results, selected_players)
                     else:
-                        st.warning("Please select at least one batter for highlights mode.")
+                        st.warning("Please select at least one player for highlights mode.")
                 elif query_mode == 'play_id':
-                    game_pk, at_bat, pitch, _, _ = params
+                    game_pk, at_bat, pitch = params[0], params[1], params[2]
                     if all([game_pk, at_bat, pitch]):
                         st.session_state.results_df = scraper.get_data_by_play_id(int(game_pk), int(at_bat), int(pitch))
                     else:
