@@ -77,15 +77,24 @@ def read_jsonl(path: str) -> List[dict]:
 
 def detections_to_jsonl_annotations(
         detections: Detections, image_shape: Tuple[int, int],
-        image_name: str, min_image_area_percentage: float, max_image_area_percentage: float,
+        image_name: str, class_labels: List[str],
+        min_image_area_percentage: float, max_image_area_percentage: float,
         approximation_percentage: float
         ):
+    
     jsonl_annotations = []
 
-    for xyxy, mask, _, class_id, _, _ in detections:
+    prefix = 'detect ' + ' ; '.join(class_labels)
+
+    for xyxy, mask, _, _, _, _ in detections:
         w, h = image_shape
         yxyx = xyxy[:, [1, 0, 3, 2]]
-        yxyx = yxyx.astype(int) * 1024 / np.array([w, h, w, h])
+        yxyx = (yxyx * 1024 / np.array([w, h, w, h])).astype(int)
+
+        print('hi')
+
+        #suffix = f"loc<{n:04d}>"{}
+
 
 def save_jsonl_file(lines: list, file_path: str) -> None:
     pass
@@ -165,6 +174,7 @@ class NewDetectionsDataset(DetectionDataset):
                     detections=annotation,
                     image_shape = image.shape,
                     image_name=image_name,
+                    class_labels = self.classes,
                     min_image_area_percentage=min_image_area_percentage,
                     max_image_area_percentage=max_image_area_percentage,
                     approximation_percentage=approximation_percentage
@@ -173,8 +183,7 @@ class NewDetectionsDataset(DetectionDataset):
                 lines.append(line)
             
             save_jsonl_file(lines=lines, file_path=annotations_path)
-            
-    
+              
 class _BaseFmt:
 
     def __init__(self, root_dir: str, force_masks: bool, is_obb: bool):
@@ -186,33 +195,16 @@ class _BaseFmt:
 
         dir_list = os.listdir(self.root_dir)
 
-
-        train_dir = self._find_respective_file(dir_list, 'train')
-        test_dir = self._find_respective_file(dir_list, 'test')
-        val_dir = self._find_respective_file(dir_list, 'val')
-        annotations_dir = self._find_respective_file(dir_list, 'annotation')
-        dataset_dir = self._find_respective_file(dir_list, 'dataset')
-
-        # TODO: Address this statement for JSONL
-        # if train_dir is None:
-        #     raise FileNotFoundError('There needs to at least be a `train` folder')
-
-        dir_attrs = {
-            "train_dir": train_dir,
-            "test_dir": test_dir,
-            "val_dir": val_dir,
-            "annotations_dir": annotations_dir,
-            "dataset_dir": dataset_dir
-        }
-
-        for attr_name, dir_name in dir_attrs.items():
-            if dir_name is not None:
-                full_path = os.path.join(self.root_dir, dir_name)
-                setattr(self, attr_name, full_path)
+        for item in dir_list:
+            if item in ['train', 'test', 'valid', 'dataset']:
+                full_path = os.path.join(self.root_dir, item)
+                setattr(self, f"{item}_dir", full_path)
+        
+        if not np.any(hasattr(self, 'train_dir'), hasattr(self, 'test_dir'), hasattr(self, 'dataset')):
+            self.logger.warning('Please ensure you have a train AND test directory or dataset. Please refer to the README for details on convention.')
 
         self.new_dir = f"{self.root_dir}_conversion"
         os.makedirs(self.new_dir, exist_ok=True)
-
 
     @property
     def detections_data(self): raise NotImplementedError
@@ -221,13 +213,14 @@ class _BaseFmt:
         train_det, test_det, val_det = detections_data
 
         train_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'train'), 
-                          annotations_path=os.path.join(self.new_dir, 'annotations', 'instances_train.json'))
+                          annotations_path=os.path.join(self.new_dir, 'train', '_annotations.coco.json'))
         
-        if test_det and val_det:
-            test_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'test'), 
-                          annotations_path=os.path.join(self.new_dir, 'annotations', 'instances_test.json'))
+        test_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'test'), 
+                          annotations_path=os.path.join(self.new_dir, 'test', '_annotations.coco.json'))
+        
+        if val_det:
             val_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'val'), 
-                          annotations_path=os.path.join(self.new_dir, 'annotations', 'instances_val.json'))
+                          annotations_path=os.path.join(self.new_dir, 'valid', '_annotations.coco.json'))
             
     def to_yolo(self, detections_data: tuple):
         train_det, test_det, val_det = detections_data
@@ -236,56 +229,41 @@ class _BaseFmt:
                           annotations_directory_path=os.path.join(self.new_dir, 'train', 'labels'),
                           data_yaml_path=os.path.join(self.new_dir, 'train_detections'))
         
-        if test_det and val_det:
-            test_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'test', 'images'),
+        test_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'test', 'images'),
                           annotations_directory_path=os.path.join(self.new_dir, 'test', 'labels'),
                           data_yaml_path=os.path.join(self.new_dir, 'test_detections'))
-            
-            val_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'val', 'images'),
-                          annotations_directory_path=os.path.join(self.new_dir, 'val', 'labels'),
-                          data_yaml_path=os.path.join(self.new_dir, 'val_detections'))
+        
+        if val_det:
+            val_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'valid', 'images'),
+                          annotations_directory_path=os.path.join(self.new_dir, 'valid', 'labels'),
+                          data_yaml_path=os.path.join(self.new_dir, 'valid_detections'))
 
     def to_pascal(self, detections_data: tuple): 
         train_det, test_det, val_det = detections_data
 
-        train_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'train', 'images'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'train', 'labels'))
+        train_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'train'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'train'))
         
-        if test_det and val_det:
-            test_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'test', 'images'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'test', 'labels'))
-            val_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'val', 'images'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'val', 'labels'))
+        test_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'test'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'test'))
+        
+        if val_det:
+            val_det.as_pascal_voc(images_directory_path=os.path.join(self.new_dir, 'valid'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'valid'))
 
     def to_jsonl(self, detections_data: tuple):
         train_det, test_det, val_det = detections_data
 
-        train_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'train'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'annotations', 'annotations_train.jsonl'))
+        train_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations.train.jsonl'))
         
-        if test_det and val_det:
-            test_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'test'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'annotations', 'annotations_test.jsonl'))
-            val_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'val'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'annotations', 'annotations_val.jsonl'))
+        test_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations.test.jsonl'))
+        
+        if val_det:
+            val_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
+                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations_valid.jsonl'))
 
-    def _find_respective_file(self, dir_list: List[str], query: str) -> Optional[str]:
-        for item in dir_list:
-            if query in item and os.path.isdir(os.path.join(self.root_dir, item)):
-                return item
-        return None
-
-    
-    def _validate_all_splits(self) -> bool:
-        """
-        Validates if all the files are found and if not, only train file is focused on.
-
-        Returns:
-            bool: True if all splits are present, False otherwise
-        """
- 
-        return all([hasattr(self, 'train_dir'), hasattr(self, 'test_dir'), hasattr(self, 'val_dir')])
-    
 class YOLOFmt(_BaseFmt):
     @property
     def detections_data(self):
@@ -301,17 +279,17 @@ class YOLOFmt(_BaseFmt):
             annotations_directory_path=os.path.join(self.train_dir, 'labels'),
             data_yaml_path=yaml_pth, force_masks=self.force_masks, is_obb=self.is_obb
             )
-
-        if self._validate_all_splits():
-            test_detections = NewDetectionsDataset.from_yolo(
+        
+        test_detections = NewDetectionsDataset.from_yolo(
                 images_directory_path=os.path.join(self.test_dir, 'images'),
                 annotations_directory_path=os.path.join(self.test_dir, 'labels'),
                 data_yaml_path=yaml_pth, force_masks=self.force_masks, is_obb=self.is_obb
                 )
 
+        if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_yolo(
-                images_directory_path=os.path.join(self.val_dir, 'images'),
-                annotations_directory_path=os.path.join(self.val_dir, 'labels'),
+                images_directory_path=os.path.join(self.valid_dir, 'images'),
+                annotations_directory_path=os.path.join(self.valid_dir, 'labels'),
                 data_yaml_path=yaml_pth, force_masks=self.force_masks, is_obb=self.is_obb
                 )
         
@@ -327,32 +305,27 @@ class YOLOFmt(_BaseFmt):
         super().to_jsonl(detections_data=self.detections_data)
         
 class COCOFmt(_BaseFmt):
-    # Requires self.annotations_dir so if not exists, raise valueerror
     @property
     def detections_data(self):
 
         train_detections, test_detections, val_detections = (None, None, None)
-        # TODO: Need to check for other json file names
-        if not hasattr(self, 'annotations_dir'):
-            self.logger.error('There needs to be an annotations directory containing the .json files')
-            return (train_detections, test_detections, val_detections)
 
         train_detections = NewDetectionsDataset.from_coco(
-            images_directory_path=os.path.join(self.train_dir, 'images'),
-            annotations_path=os.path.join(self.annotations_dir, 'instances_train.json'),
+            images_directory_path=self.train_dir,
+            annotations_path=glob.glob(os.path.join(self.train_dir, '*.json'))[0],
             force_masks=self.force_masks
             )
-
-        if self._validate_all_splits():
-            test_detections = NewDetectionsDataset.from_coco(
-                images_directory_path=os.path.join(self.test_dir, 'images'),
-                annotations_path=os.path.join(self.annotations_dir, 'instances_test.json'),
+        
+        test_detections = NewDetectionsDataset.from_coco(
+                images_directory_path=self.test_dir,
+                annotations_path=glob.glob(os.path.join(self.test_dir, '*.json'))[0],
                 force_masks=self.force_masks
                 )
 
+        if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_coco(
-                images_directory_path=os.path.join(self.val_dir, 'images'),
-                annotations_path=os.path.join(self.annotations_dir, 'instances_val.json'),
+                images_directory_path=self.valid_dir,
+                annotations_path=glob.glob(os.path.join(self.valid_dir, '*.json'))[0],
                 force_masks=self.force_masks
                 )
             
@@ -378,17 +351,17 @@ class PascalFmt(_BaseFmt):
             annotations_path=self.train_dir,
             force_masks=self.force_masks
             )
-
-        if self._validate_all_splits():
-            test_detections = NewDetectionsDataset.from_pascal_voc(
+        
+        test_detections = NewDetectionsDataset.from_pascal_voc(
                 images_directory_path=self.test_dir,
                 annotations_path=self.test_dir,
                 force_masks=self.force_masks
                 )
 
+        if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_pascal_voc(
-                images_directory_path=self.val_dir,
-                annotations_path=self.val_dir,
+                images_directory_path=self.valid_dir,
+                annotations_path=self.valid_dir,
                 force_masks=self.force_masks
                 )
             
@@ -409,7 +382,6 @@ class JsonLFmt(_BaseFmt):
     def detections_data(self):
         train_detections, test_detections, val_detections = (None, None, None)
 
-        # TODO: Need to check for other json file names
         if not hasattr(self, 'dataset_dir'):
             self.logger.error('There needs to be a dataset directory containing the jsonl and image files')
             return (train_detections, test_detections, val_detections)
@@ -420,16 +392,16 @@ class JsonLFmt(_BaseFmt):
             force_masks=self.force_masks
             )
 
-        if self._validate_all_splits():
-            test_detections = NewDetectionsDataset.from_jsonl(
+        test_detections = NewDetectionsDataset.from_jsonl(
                 images_directory_path=self.dataset_dir,
-                annotations_path=os.path.join(self.dataset_dir, 'instances_test.jsonl'),
+                annotations_path=os.path.join(self.dataset_dir, '_annotations.test.jsonl'),
                 force_masks=self.force_masks
                 )
 
+        if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_jsonl(
                 images_directory_path=self.dataset_dir,
-                annotations_path=os.path.join(self.dataset_dir, 'instances_val.jsonl'),
+                annotations_path=os.path.join(self.dataset_dir, '_annotations.valid.jsonl'),
                 force_masks=self.force_masks
                 )
         

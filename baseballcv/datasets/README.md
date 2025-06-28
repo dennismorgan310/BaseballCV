@@ -45,14 +45,14 @@ The `DatasetTranslator` is a wrapper for roboflow's `DetectionDataset` class whi
 Expected input for YOLO:
 ```
 Root/
-| data.yaml (optional)
+| *.yaml
 ├── train/
 |   ├── images/
 |   ├── labels/
-├── test/ (optional)
+├── test/
 |   ├── images/
 |   ├── labels/
-├── val/ (optional)
+├── valid/ (optional)
 |   ├── images/
 |   ├── labels/
 ```
@@ -61,24 +61,25 @@ Expected input for COCO:
 ```
 Root/
 ├── train/
+|   ├── *.json
 |   ├── images/
 |   ├── labels/
-├── test/ (optional)
+├── test/
+|   ├── *.json
 |   ├── images/
 |   ├── labels/
-├── val/ (optional)
+├── valid/ (optional)
+|   ├── *.json
 |   ├── images/
 |   ├── labels/
-├── annotations/
-|   ├── instances_train.json (test and val are required if directories exist)
 ```
 
 Expected input for Pascal Voc (.xml files + images should be in these folders):
 ```
 Root/
 ├── train/
-├── test/ (optional)
-├── val/ (optional)
+├── test/
+├── valid/ (optional)
 ```
 
 Expected input for JSONL:
@@ -86,8 +87,8 @@ Expected input for JSONL:
 Root/
 ├── dataset/
 |   ├── *_train.jsonl
-|   ├── *_test.jsonl (optional)
-|   ├── *_val.jsonl (optional)
+|   ├── *_test.jsonl
+|   ├── *_valid.jsonl (optional)
 |   ├── images.jpg (rest of images)
 ```
 

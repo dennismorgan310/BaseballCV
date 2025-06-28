@@ -9,14 +9,15 @@ TRANSLATOR = {
 }
 
 class DatasetTranslator:
-    def __init__(self, 
-                 format_name: str, 
-                 conversion_name: str,
-                 root_dir: str,
-                 *,
-                 force_masks: bool = False,
-                 is_obb: bool = False
-                 ) -> None:
+    def __init__(
+            self, 
+            format_name: str, 
+            conversion_name: str,
+            root_dir: str,
+            *,
+            force_masks: bool = False,
+            is_obb: bool = False
+            ) -> None:
         
         format_name = format_name.lower()
         conversion_name = conversion_name.lower()
