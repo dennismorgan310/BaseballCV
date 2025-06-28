@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 import json
 import re
-from typing import Tuple, List, Optional, Dict
-from baseballcv.utilities import BaseballCVLogger
 import glob
+from baseballcv.utilities import BaseballCVLogger
+from typing import Tuple, List, Optional, Dict
 
 # What's left to do:
 # 1. Implement functionality to save jsonl files
@@ -104,8 +104,30 @@ class NewDetectionsDataset(DetectionDataset):
     A Monkey Patch Class of Roboflow's `DetectionDataset` with a JSONL implementation in place
     """
 
-    def __init__(self, classes, images, annotations):
+    def __init__(self, classes, images, annotations) -> None:
         super().__init__(classes, images, annotations)
+
+    @classmethod
+    def from_yolo(cls, *args, **kwargs) -> "NewDetectionsDataset":
+        base = DetectionDataset.from_yolo(*args, **kwargs)
+        return cls._from_base(base)
+
+    @classmethod
+    def from_coco(cls, *args, **kwargs) -> "NewDetectionsDataset":
+        base = DetectionDataset.from_coco(*args, **kwargs)
+        return cls._from_base(base)
+    
+    @classmethod
+    def from_pascal_voc(cls, *args, **kwargs) -> "NewDetectionsDataset":
+        base = DetectionDataset.from_pascal_voc(*args, **kwargs)
+        return cls._from_base(base)
+
+    @classmethod
+    def _from_base(cls, base: DetectionDataset):
+        # Cast DetectionDataset → NewDetectionsDataset
+        obj = cls.__new__(cls)
+        obj.__dict__ = base.__dict__
+        return obj
 
     @classmethod
     def from_jsonl(cls, images_directory_path: str, annotations_path: str, force_masks: bool) -> DetectionDataset:
@@ -200,8 +222,10 @@ class _BaseFmt:
                 full_path = os.path.join(self.root_dir, item)
                 setattr(self, f"{item}_dir", full_path)
         
-        if not np.any(hasattr(self, 'train_dir'), hasattr(self, 'test_dir'), hasattr(self, 'dataset')):
-            self.logger.warning('Please ensure you have a train AND test directory or dataset. Please refer to the README for details on convention.')
+        if not all(hasattr(self, attr) for attr in ['train_dir', 'test_dir']):
+            self.logger.warning('Please ensure you have a train AND test directory. ' \
+            'Please refer to the README for details on convention. ' \
+            'If you are using, JSONL, you just need a dataset directory.')
 
         self.new_dir = f"{self.root_dir}_conversion"
         os.makedirs(self.new_dir, exist_ok=True)
@@ -255,14 +279,14 @@ class _BaseFmt:
         train_det, test_det, val_det = detections_data
 
         train_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations.train.jsonl'))
+                          annotations_path=os.path.join(self.new_dir, 'dataset', '_annotations.train.jsonl'))
         
         test_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations.test.jsonl'))
+                          annotations_path=os.path.join(self.new_dir, 'dataset', '_annotations.test.jsonl'))
         
         if val_det:
             val_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
-                          annotations_directory_path=os.path.join(self.new_dir, 'dataset', '_annotations_valid.jsonl'))
+                          annotations_path=os.path.join(self.new_dir, 'dataset', '_annotations_valid.jsonl'))
 
 class YOLOFmt(_BaseFmt):
     @property
