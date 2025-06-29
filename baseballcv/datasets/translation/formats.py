@@ -1,6 +1,6 @@
 from supervision import DetectionDataset, Detections
 from supervision.detection.utils import polygon_to_mask
-from supervision.dataset.utils import save_dataset_images
+from supervision.dataset.utils import save_dataset_images, approximate_mask_with_polygons
 import os
 from pathlib import Path
 import cv2
@@ -12,9 +12,8 @@ from baseballcv.utilities import BaseballCVLogger
 from typing import Tuple, List, Optional, Dict
 
 # What's left to do:
-# 1. Implement functionality to save jsonl files
-# 2. Fix dumb bug for the masking
-# 3. Write unit tests + check for edge cases
+# 1. Fix dumb bug for the masking
+# 2. Write unit tests + check for edge cases
 
 def jsonl_to_detections(image_annotations: str, 
                         resolution_wh: Tuple[int, int], with_masks: bool,
@@ -76,28 +75,56 @@ def read_jsonl(path: str) -> List[dict]:
         return data
 
 def detections_to_jsonl_annotations(
-        detections: Detections, image_shape: Tuple[int, int],
+        detections: Detections, image_shape: Tuple[int, int, int],
         image_name: str, class_labels: List[str],
         min_image_area_percentage: float, max_image_area_percentage: float,
         approximation_percentage: float
-        ):
-    
-    jsonl_annotations = []
+        ) -> Dict[str, str]:
+
+    classes_dict = {identifier: name for identifier, name in enumerate(class_labels)}
 
     prefix = 'detect ' + ' ; '.join(class_labels)
+    
+    h, w, _ = image_shape
+    suffixes = []
+    
+    for xyxy, mask, _, class_id, _, _ in detections:
+        label = classes_dict.get(class_id)
 
-    for xyxy, mask, _, _, _, _ in detections:
-        w, h = image_shape
-        yxyx = xyxy[:, [1, 0, 3, 2]]
-        yxyx = (yxyx * 1024 / np.array([w, h, w, h])).astype(int)
+        if mask is not None:
+            polygons = approximate_mask_with_polygons(
+                mask=mask,
+                min_image_area_percentage=min_image_area_percentage,
+                max_image_area_percentage=max_image_area_percentage,
+                approximation_percentage=approximation_percentage
+            )
 
-        print('hi')
+            for polygon in polygons:
+                scaled_polygon = (polygon * 1024 / np.array([w, h])).astype(int)
+                suffix = ''.join(f"<loc{coord:04d}>" for point in scaled_polygon for coord in point)
+                suffix += f" {label}"
+                suffixes.append(suffix)
 
-        #suffix = f"loc<{n:04d}>"{}
+        else:
+            yxyx = xyxy[[1, 0, 3, 2]]
+            yxyx = (yxyx * 1024 / np.array([w, h, w, h])).astype(int)
 
+            suffix = ''.join(f"<loc{num:04d}>" for num in yxyx) + f" {label}"
+
+            suffixes.append(suffix)
+    
+    suffixes = ' ; '.join(suffixes)
+
+    return {
+        'image_path': image_name,
+        'prefix': prefix,
+        'suffix': suffixes
+    }
 
 def save_jsonl_file(lines: list, file_path: str) -> None:
-    pass
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for line in lines:
+            f.write(json.dumps(line) + '\n')
 
 class NewDetectionsDataset(DetectionDataset):
     """
@@ -130,7 +157,7 @@ class NewDetectionsDataset(DetectionDataset):
         return obj
 
     @classmethod
-    def from_jsonl(cls, images_directory_path: str, annotations_path: str, force_masks: bool) -> DetectionDataset:
+    def from_jsonl(cls, images_directory_path: str, annotations_path: str, force_masks: bool) -> "NewDetectionsDataset":
         jsonl_data = read_jsonl(path=annotations_path)
 
         images = []
@@ -146,7 +173,7 @@ class NewDetectionsDataset(DetectionDataset):
 
             image_path = os.path.join(images_directory_path, image_name)
 
-            (image_width, image_height, _) = cv2.imread(image_path).shape
+            (image_height, image_width, _) = cv2.imread(image_path).shape
 
             pattern = re.compile(r'\b(?!detect\b)(\w+)')
 
@@ -170,7 +197,7 @@ class NewDetectionsDataset(DetectionDataset):
             images.append(image_path)
             annotations[image_path] = annotation
 
-        return DetectionDataset(classes=classes, images=images, annotations=annotations)
+        return NewDetectionsDataset(classes=classes, images=images, annotations=annotations)
     
     def as_jsonl(self: "NewDetectionsDataset",
         images_directory_path: Optional[str] = None,
@@ -179,6 +206,26 @@ class NewDetectionsDataset(DetectionDataset):
         max_image_area_percentage: float = 1.0,
         approximation_percentage: float = 0.0,
     ) -> None:
+        """
+        Exports the dataset to JSONL format. This method saves the images
+        and their corresponding annotations in the Paligemma JSONL format.
+
+        Args:
+            images_directory_path (Optional[str], optional): The path where the images are saved. Defaults to None.
+            annotations_path (Optional[str], optional): The path where the JSONL annotations are saved. Defaults to None.
+            min_image_area_percentage (float, optional): The minimum percentage of
+                detection area relative to
+                the image area for a detection to be included.
+                Argument is used only for segmentation datasets. Defaults to 0.0.
+            max_image_area_percentage (float, optional): The maximum percentage
+                of detection area relative to
+                the image area for a detection to be included.
+                Argument is used only for segmentation datasets. Defaults to 1.0.
+            approximation_percentage (float, optional): The percentage of
+                polygon points to be removed from the input polygon,
+                in the range [0, 1). Argument is used only for segmentation datasets. Defaults to 0.0.
+        """
+
         if images_directory_path:
             save_dataset_images(
                 dataset=self, 
@@ -186,7 +233,7 @@ class NewDetectionsDataset(DetectionDataset):
             )
         
         if annotations_path:
-            Path(annotations_path).mkdir(parents=True, exist_ok=True)
+            Path(annotations_path).parent.mkdir(parents=True, exist_ok=True)
 
             lines = []
             for image_path, image, annotation in self:

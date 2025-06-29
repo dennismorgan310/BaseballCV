@@ -19,8 +19,8 @@ class DatasetTranslator:
             is_obb: bool = False
             ) -> None:
         
-        format_name = format_name.lower()
-        conversion_name = conversion_name.lower()
+        format_name = format_name.lower().strip()
+        conversion_name = conversion_name.lower().strip()
 
         if format_name not in TRANSLATOR:
             raise ValueError(f"Invalid format: {format_name}",
