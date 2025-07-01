@@ -6,7 +6,7 @@ description: "BaseballCV documentation - Computer Vision Tools for Baseball Anal
 permalink: /
 ---
 
-# BaseballCV Documentation
+# BaseballCV Documentation 
 
 Welcome to the BaseballCV documentation. This comprehensive guide will help you understand and utilize computer vision tools for baseball analytics.
 
@@ -45,6 +45,6 @@ Choose a section from the navigation menu to begin learning about BaseballCV:
 
 <div align="center">
 
-**Created By: Dylan Drummey and Carlos Marcano**
+**Created By: Dylan Drummey and Carlos Marcano, 2024**
 
 <div>
