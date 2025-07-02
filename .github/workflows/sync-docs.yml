@@ -27,44 +27,31 @@ jobs:
     
     - name: Sync documentation files
       run: |
-        echo "🔄 Syncing docs/ to BaseballCVWeb..."
+        echo "Syncing docs to BaseballCVWeb..."
         
-        # Remove existing content (except .git, .github, README.md)
         cd baseballcv-web
-        find . -mindepth 1 -maxdepth 1 \
-          ! -name '.git' \
-          ! -name '.github' \
-          ! -name 'README.md' \
-          -exec rm -rf {} +
+        find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name 'README.md' -exec rm -rf {} +
         
-        # Copy everything from docs/ folder
         cp -r ../baseballcv-main/docs/* .
         
-        echo "✅ Files synced"
+        echo "Files synced successfully"
     
-    - name: Check for changes and commit
+    - name: Commit and push changes
       run: |
         cd baseballcv-web
         
-        # Configure git
         git config user.name "Documentation Sync Bot"
         git config user.email "noreply@baseballcv.com"
         
-        # Check if there are any changes
         if git diff --quiet && git diff --cached --quiet; then
-          echo "ℹ️ No changes to commit"
+          echo "No changes to commit"
           exit 0
         fi
         
-        # Add and commit changes
         git add .
-        git commit -m "📚 Sync docs from BaseballCV@${GITHUB_SHA:0:7}
-
-Synced from: https://github.com/BaseballCV/BaseballCV/commit/$GITHUB_SHA
-Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         
-        # Push changes
+        git commit -m "Sync docs from BaseballCV at $(date -u)"
+        
         git push origin main
         
-        echo "✅ Documentation synced to BaseballCVWeb"
-        echo "🔄 Webhook will trigger automatic deployment"
+        echo "Documentation synced successfully"
