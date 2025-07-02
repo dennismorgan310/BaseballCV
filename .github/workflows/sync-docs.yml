@@ -50,7 +50,8 @@ jobs:
         
         git add .
         
-        git commit -m "Sync docs from BaseballCV at $(date -u)"
+        COMMIT_MSG="Sync docs from BaseballCV@${GITHUB_SHA:0:7} - $(date -u)"
+        git commit -m "$COMMIT_MSG"
         
         git push origin main
         
