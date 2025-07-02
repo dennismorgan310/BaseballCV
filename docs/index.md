@@ -45,6 +45,6 @@ Choose a section from the navigation menu to begin learning about BaseballCV:
 
 <div align="center">
 
-**Created By: Dylan Drummey and Carlos Marcano - 2025**
+**Created By: Dylan Drummey and Carlos Marcano - 2025 Y**
 
 <div>
