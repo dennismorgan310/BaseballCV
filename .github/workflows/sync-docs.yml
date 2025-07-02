@@ -6,11 +6,6 @@ on:
     paths:
       - 'docs/**'
   workflow_dispatch:
-    inputs:
-      force_sync:
-        description: 'Force sync even if no docs changes detected'
-        required: false
-        default: 'false'
 
 jobs:
   sync-docs:
@@ -20,7 +15,6 @@ jobs:
     - name: Checkout BaseballCV repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
         token: ${{ secrets.SYNC_TOKEN }}
         path: baseballcv-main
     
@@ -31,30 +25,9 @@ jobs:
         token: ${{ secrets.SYNC_TOKEN }}
         path: baseballcv-web
     
-    - name: Debug - Show trigger information
-      run: |
-        echo "Event name: ${{ github.event_name }}"
-        echo "Repository: ${{ github.repository }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "SHA: ${{ github.sha }}"
-        if [ "${{ github.event_name }}" = "push" ]; then
-          echo "Modified files in this push:"
-          cd baseballcv-main
-          git show --name-only --pretty=format: ${{ github.sha }}
-        fi
-    
-    - name: Check if docs folder exists
-      run: |
-        if [ ! -d "baseballcv-main/docs" ]; then
-          echo "❌ Error: docs/ folder not found in BaseballCV repository"
-          exit 1
-        fi
-        echo "✅ Found docs/ folder"
-        ls -la baseballcv-main/docs/
-    
     - name: Sync documentation files
       run: |
-        echo "🔄 Starting documentation sync..."
+        echo "🔄 Syncing docs/ to BaseballCVWeb..."
         
         # Remove existing content (except .git, .github, README.md)
         cd baseballcv-web
@@ -64,139 +37,12 @@ jobs:
           ! -name 'README.md' \
           -exec rm -rf {} +
         
-        # Copy docs content from main repo
-        echo "📁 Copying files from docs/ folder..."
+        # Copy everything from docs/ folder
         cp -r ../baseballcv-main/docs/* .
         
-        # List copied files for debugging
-        echo "📋 Files copied:"
-        find . -type f ! -path './.git/*' ! -path './.github/*' | head -20
-        
-        # Ensure _config.yml is properly configured for production
-        echo "⚙️ Ensuring _config.yml is configured..."
-        cat > _config.yml << 'EOF'
-title: BaseballCV Documentation
-description: Documentation for BaseballCV - Computer Vision Tools for Baseball Analytics
-remote_theme: just-the-docs/just-the-docs@v0.7.0
-
-url: https://www.baseballcv.com
-baseurl: ""
-
-logo: "/assets/images/logo.png"
-
-aux_links:
-  "BaseballCV on GitHub":
-    - "//github.com/BaseballCV/BaseballCV"
-
-plugins:
-  - jekyll-remote-theme
-  - jekyll-seo-tag
-  - jekyll-sitemap
-  - jekyll-feed
-
-markdown: kramdown
-highlighter: rouge
-kramdown:
-  input: GFM
-  hard_wrap: false
-
-exclude:
-  - .sass-cache/
-  - .jekyll-cache/
-  - gemfiles/
-  - Gemfile
-  - Gemfile.lock
-  - node_modules/
-  - vendor/bundle/
-  - vendor/cache/
-  - vendor/gems/
-  - vendor/ruby/
-
-callouts:
-  note:
-    title: Note
-    color: blue
-  tip:
-    title: Tip
-    color: green
-  warning:
-    title: Warning
-    color: red
-EOF
-        
-        # Ensure Gemfile exists
-        echo "💎 Ensuring Gemfile is configured..."
-        cat > Gemfile << 'EOF'
-source 'https://rubygems.org'
-
-gem "jekyll", "~> 4.3.2"
-gem "jekyll-remote-theme"
-gem "jekyll-seo-tag"
-gem "jekyll-sitemap"
-gem "jekyll-feed"
-gem "webrick"
-
-platforms :mingw, :x64_mingw, :mswin, :jruby do
-  gem "tzinfo", ">= 1", "< 3"
-  gem "tzinfo-data"
-end
-
-gem "wdm", "~> 0.1.1", :platforms => [:mingw, :x64_mingw, :mswin]
-EOF
-
-        # Create .gitignore if it doesn't exist
-        if [ ! -f ".gitignore" ]; then
-          cat > .gitignore << 'EOF'
-_site/
-.sass-cache/
-.jekyll-cache/
-.jekyll-metadata
-vendor/
-Gemfile.lock
-.bundle/
-node_modules/
-*.gem
-*.rbc
-.config
-.yardoc
-InstalledFiles
-lib/bundler/man/
-pkg/
-rdoc/
-spec/reports/
-test/tmp/
-test/version_tmp/
-tmp/
-_posts/.DS_Store
-*.DS_Store
-EOF
-        fi
-        
-        echo "✅ Documentation sync preparation complete"
+        echo "✅ Files synced"
     
-    - name: Check for changes
-      id: changes
-      run: |
-        cd baseballcv-web
-        
-        # Show git status for debugging
-        echo "📊 Git status:"
-        git status --porcelain
-        
-        if git diff --quiet && git diff --cached --quiet; then
-          echo "has_changes=false" >> $GITHUB_OUTPUT
-          echo "ℹ️ No changes detected"
-        else
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "✅ Changes detected"
-          
-          # Show what changed
-          echo "📝 Changed files:"
-          git status --porcelain
-        fi
-    
-    - name: Commit and push changes
-      if: steps.changes.outputs.has_changes == 'true'
+    - name: Check for changes and commit
       run: |
         cd baseballcv-web
         
@@ -204,51 +50,21 @@ EOF
         git config user.name "Documentation Sync Bot"
         git config user.email "noreply@baseballcv.com"
         
-        # Add all changes
+        # Check if there are any changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "ℹ️ No changes to commit"
+          exit 0
+        fi
+        
+        # Add and commit changes
         git add .
-        
-        # Create detailed commit message
-        COMMIT_MSG="📚 Sync documentation from BaseballCV@${GITHUB_SHA:0:7}
+        git commit -m "📚 Sync docs from BaseballCV@${GITHUB_SHA:0:7}
 
-Source: https://github.com/BaseballCV/BaseballCV/commit/$GITHUB_SHA
-Trigger: ${{ github.event.head_commit.message || 'Manual workflow dispatch' }}
-Sync time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-
-This commit was automatically generated by the documentation sync workflow."
+Synced from: https://github.com/BaseballCV/BaseballCV/commit/$GITHUB_SHA
+Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         
-        echo "💾 Committing changes..."
-        git commit -m "$COMMIT_MSG"
-        
-        echo "🚀 Pushing to BaseballCVWeb repository..."
+        # Push changes
         git push origin main
         
-        echo "✅ Documentation sync completed successfully!"
-    
-    - name: Create success summary
-      if: steps.changes.outputs.has_changes == 'true'
-      run: |
-        echo "## 📚 Documentation Sync Complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Status:** ✅ Successfully synced documentation" >> $GITHUB_STEP_SUMMARY
-        echo "**Source:** BaseballCV/BaseballCV@${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Target:** BaseballCV/BaseballCVWeb" >> $GITHUB_STEP_SUMMARY
-        echo "**Website:** https://www.baseballcv.com" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### What happens next:" >> $GITHUB_STEP_SUMMARY
-        echo "1. ✅ Documentation synced to web repository" >> $GITHUB_STEP_SUMMARY
-        echo "2. 🔄 Webhook will trigger automatic deployment" >> $GITHUB_STEP_SUMMARY
-        echo "3. 🌐 Website will update within 1-2 minutes" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Monitor deployment:** Check your server logs with \`tail -f /home/carlos/baseballcv-deploy.log\`" >> $GITHUB_STEP_SUMMARY
-    
-    - name: No changes summary
-      if: steps.changes.outputs.has_changes == 'false'
-      run: |
-        echo "## 📚 Documentation Sync Skipped" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Status:** ⏭️ No changes detected" >> $GITHUB_STEP_SUMMARY
-        echo "**Reason:** Documentation content is already up to date" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "If you expected changes, check that:" >> $GITHUB_STEP_SUMMARY
-        echo "- Files were modified in the \`docs/\` folder" >> $GITHUB_STEP_SUMMARY
-        echo "- Changes were committed and pushed to the main branch" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Documentation synced to BaseballCVWeb"
+        echo "🔄 Webhook will trigger automatic deployment"
