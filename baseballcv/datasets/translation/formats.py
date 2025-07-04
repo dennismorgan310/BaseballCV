@@ -246,7 +246,7 @@ class _BaseFmt:
                           annotations_path=os.path.join(self.new_dir, 'test', '_annotations.coco.json'))
         
         if val_det:
-            val_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'val'), 
+            val_det.as_coco(images_directory_path=os.path.join(self.new_dir, 'valid'), 
                           annotations_path=os.path.join(self.new_dir, 'valid', '_annotations.coco.json'))
             
     def to_yolo(self, detections_data: tuple):
@@ -272,7 +272,7 @@ class _BaseFmt:
             'val': os.path.join(self.new_dir, 'val', 'images') if val_det else os.path.join(self.new_dir, 'test', 'images'),
             'test': os.path.join(self.new_dir, 'test', 'images'),
             'nc': len(classes),
-            'names': classes
+            'names': list(classes)
         }
 
         import yaml
@@ -426,6 +426,8 @@ class JsonLFmt(_BaseFmt):
         if not hasattr(self, 'dataset_dir'):
             self.logger.error('There needs to be a dataset directory containing the jsonl and image files')
             return (train_detections, test_detections, val_detections)
+        
+        jsonl_files = glob.glob(os.path.join(self.dataset_dir, '*.jsonl'))
 
         train_detections = NewDetectionsDataset.from_jsonl(
             images_directory_path=self.dataset_dir,
@@ -437,7 +439,7 @@ class JsonLFmt(_BaseFmt):
                 annotations_path=os.path.join(self.dataset_dir, '_annotations.test.jsonl')
                 )
 
-        if hasattr(self, 'valid_dir'):
+        if len(jsonl_files) == 3:
             val_detections = NewDetectionsDataset.from_jsonl(
                 images_directory_path=self.dataset_dir,
                 annotations_path=os.path.join(self.dataset_dir, '_annotations.valid.jsonl')
