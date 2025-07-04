@@ -42,6 +42,15 @@ dataset = JSONLDetectionDataset(jsonl_file_path="annotations.jsonl", image_direc
 ## Dataset Translator
 The `DatasetTranslator` is a wrapper for roboflow's `DetectionDataset` class which extracts the images and annotations from your input directories and converts it to the desired dataset class. To reduce errors with running this function, we are making assumptions on the file directories you are using. If you're directory is not in line with what we expect, it can lead to errors or undesirable results. Please take a look at the expected structure below to make sure your input directories are supported by our translator. 
 
+Example:
+```python
+from baseballcv.datasets import DatasetTranslator
+
+dt = DatasetTranslator('coco', 'yolo', root_dir='dataset_dir/', conversion_dir='new_conversions/')
+dt.convert()
+dt.fmt_instance # If you want to check the formatted instance, should be COOCFmt
+```
+
 Expected input for YOLO:
 ```
 Root/

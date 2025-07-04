@@ -9,6 +9,18 @@ TRANSLATOR = {
 }
 
 class DatasetTranslator:
+    """
+    Class that translates various dataset formats across the Computer Vision
+    space.
+
+    Args:
+        format_name (str): The current format of your dataset
+        conversion_name (str): The format of the desired translation
+        root_dir (str): The directory pointing to your dataset
+        conversion_dir (str): The name of the directory for conversions. Defaults to 'dataset_conversion'
+        force_masks (bool): If segmentation is involved. Defaults to False
+        is_obb (bool): If labels are in OBB format, used for YOLO
+    """
     def __init__(
             self, 
             format_name: str, 
@@ -38,4 +50,7 @@ class DatasetTranslator:
         self._convert_fn = getattr(self.fmt_instance, f'to_{conversion_name}')
 
     def convert(self) -> None:
+        """
+        Converts to desired dataset format based on constructor args.
+        """
         self._convert_fn()
