@@ -44,6 +44,6 @@ Choose a section from the navigation menu to begin learning about BaseballCV:
 
 <div align="center">
 
-**--- Created By: Dylan Drummey and Carlos Marcano**
+**---- Created By: Dylan Drummey and Carlos Marcano**
 
 <div>
