@@ -1,6 +1,5 @@
 from supervision import DetectionDataset, Detections
-from supervision.detection.utils import polygon_to_mask
-from supervision.dataset.utils import save_dataset_images, approximate_mask_with_polygons
+from supervision.dataset.utils import save_dataset_images
 import os
 from pathlib import Path
 import cv2
@@ -11,12 +10,8 @@ import glob
 from baseballcv.utilities import BaseballCVLogger
 from typing import Tuple, List, Optional, Dict
 
-# What's left to do:
-# 1. Fix dumb bug for the masking
-# 2. Write unit tests + check for edge cases
-
 def jsonl_to_detections(image_annotations: str, 
-                        resolution_wh: Tuple[int, int], with_masks: bool,
+                        resolution_wh: Tuple[int, int],
                         classes: Dict[str, int]) -> Detections:
         
         if not image_annotations:
@@ -41,26 +36,6 @@ def jsonl_to_detections(image_annotations: str,
         class_name = class_name[filter]
         class_id = np.array([classes.get(name) for name in class_name])
 
-        relative_polygons = [np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]]) for (x1, y1, x2, y2) in xyxy]
-
-        if with_masks:
-            polygons = [
-                    (polygon * np.array(resolution_wh)).astype(int) for polygon in relative_polygons
-                ]
-            mask = np.array(
-                [
-                    polygon_to_mask(polygon=polygon, resolution_wh=resolution_wh)
-                    for polygon in polygons
-                ],
-                dtype=bool,
-            )
-            
-            if not np.any(mask):
-                # This is some weird bug that's caused by the whol array being False. Need to figure out why.
-                return Detections.empty()
-
-            return Detections(xyxy=xyxy, class_id=class_id, mask=mask)
-
         return Detections(xyxy=xyxy, class_id=class_id)
 
 def read_jsonl(path: str) -> List[dict]:
@@ -76,9 +51,7 @@ def read_jsonl(path: str) -> List[dict]:
 
 def detections_to_jsonl_annotations(
         detections: Detections, image_shape: Tuple[int, int, int],
-        image_name: str, class_labels: List[str],
-        min_image_area_percentage: float, max_image_area_percentage: float,
-        approximation_percentage: float
+        image_name: str, class_labels: List[str]
         ) -> Dict[str, str]:
 
     classes_dict = {identifier: name for identifier, name in enumerate(class_labels)}
@@ -88,30 +61,14 @@ def detections_to_jsonl_annotations(
     h, w, _ = image_shape
     suffixes = []
     
-    for xyxy, mask, _, class_id, _, _ in detections:
+    for xyxy, _, _, class_id, _, _ in detections:
         label = classes_dict.get(class_id)
+        yxyx = xyxy[[1, 0, 3, 2]]
+        yxyx = (yxyx * 1024 / np.array([w, h, w, h])).astype(int)
 
-        if mask is not None:
-            polygons = approximate_mask_with_polygons(
-                mask=mask,
-                min_image_area_percentage=min_image_area_percentage,
-                max_image_area_percentage=max_image_area_percentage,
-                approximation_percentage=approximation_percentage
-            )
+        suffix = ''.join(f"<loc{num:04d}>" for num in yxyx) + f" {label}"
 
-            for polygon in polygons:
-                scaled_polygon = (polygon * 1024 / np.array([w, h])).astype(int)
-                suffix = ''.join(f"<loc{coord:04d}>" for point in scaled_polygon for coord in point)
-                suffix += f" {label}"
-                suffixes.append(suffix)
-
-        else:
-            yxyx = xyxy[[1, 0, 3, 2]]
-            yxyx = (yxyx * 1024 / np.array([w, h, w, h])).astype(int)
-
-            suffix = ''.join(f"<loc{num:04d}>" for num in yxyx) + f" {label}"
-
-            suffixes.append(suffix)
+        suffixes.append(suffix)
     
     suffixes = ' ; '.join(suffixes)
 
@@ -157,15 +114,37 @@ class NewDetectionsDataset(DetectionDataset):
         return obj
 
     @classmethod
-    def from_jsonl(cls, images_directory_path: str, annotations_path: str, force_masks: bool) -> "NewDetectionsDataset":
+    def from_jsonl(cls, images_directory_path: str, annotations_path: str) -> "NewDetectionsDataset":
+        """
+        Creates a Dataset Instance from JSONL (Paligemma) formatted data.
+
+        Args:
+            images_directory_path (str): The path to the directory containing images
+            annotations_path (str): The directory path containing the JSONL annotations
+
+        Returns:
+            NewDetectionsDataset: A DetectionDataset instance containing the loaded images and annotations
+
+        Example:
+            ```python
+            from baseballcv.datasets.translation.formats import NewDetectionDataset
+
+            ds = NewDetectionsDataset.from_jsonl(
+                images_directory_path=f"{dataset.location}/dataset",
+                annotations_path=f"{dataset.location}/dataset/_annotations.train.jsonl"
+            )
+
+            ds.classes
+            # ['Class1', 'Class2']
+            ```
+        """
         jsonl_data = read_jsonl(path=annotations_path)
 
         images = []
         annotations = {}
-
-        # assume prefix is the same throughout JSONL
+        
+        # assume prefix is the same throughout JSONL, so assign it only once
         classes_dict = None
-        assigned_class = False
 
         for jsonl_image in jsonl_data:
             # Extract name, width, height from the name + suffix
@@ -179,20 +158,14 @@ class NewDetectionsDataset(DetectionDataset):
 
             classes = pattern.findall(jsonl_image['prefix'])
 
-            if assigned_class == False:
+            if classes_dict is None:
                 classes_dict = {name: identifier for identifier, name in enumerate(classes)}
-                assigned_class = True
-
 
             annotation = jsonl_to_detections(
                 image_annotations=jsonl_image['suffix'],
                 resolution_wh=(image_width, image_height),
-                with_masks=force_masks,
                 classes=classes_dict
             )
-
-            if annotation.is_empty() and force_masks:
-                continue
             
             images.append(image_path)
             annotations[image_path] = annotation
@@ -202,9 +175,6 @@ class NewDetectionsDataset(DetectionDataset):
     def as_jsonl(self: "NewDetectionsDataset",
         images_directory_path: Optional[str] = None,
         annotations_path: Optional[str] = None,
-        min_image_area_percentage: float = 0.0,
-        max_image_area_percentage: float = 1.0,
-        approximation_percentage: float = 0.0,
     ) -> None:
         """
         Exports the dataset to JSONL format. This method saves the images
@@ -213,17 +183,6 @@ class NewDetectionsDataset(DetectionDataset):
         Args:
             images_directory_path (Optional[str], optional): The path where the images are saved. Defaults to None.
             annotations_path (Optional[str], optional): The path where the JSONL annotations are saved. Defaults to None.
-            min_image_area_percentage (float, optional): The minimum percentage of
-                detection area relative to
-                the image area for a detection to be included.
-                Argument is used only for segmentation datasets. Defaults to 0.0.
-            max_image_area_percentage (float, optional): The maximum percentage
-                of detection area relative to
-                the image area for a detection to be included.
-                Argument is used only for segmentation datasets. Defaults to 1.0.
-            approximation_percentage (float, optional): The percentage of
-                polygon points to be removed from the input polygon,
-                in the range [0, 1). Argument is used only for segmentation datasets. Defaults to 0.0.
         """
 
         if images_directory_path:
@@ -243,10 +202,7 @@ class NewDetectionsDataset(DetectionDataset):
                     detections=annotation,
                     image_shape = image.shape,
                     image_name=image_name,
-                    class_labels = self.classes,
-                    min_image_area_percentage=min_image_area_percentage,
-                    max_image_area_percentage=max_image_area_percentage,
-                    approximation_percentage=approximation_percentage
+                    class_labels = self.classes
                 )
 
                 lines.append(line)
@@ -255,7 +211,7 @@ class NewDetectionsDataset(DetectionDataset):
               
 class _BaseFmt:
 
-    def __init__(self, root_dir: str, force_masks: bool, is_obb: bool):
+    def __init__(self, root_dir: str, conversion_dir: str, force_masks: bool, is_obb: bool):
 
         self.root_dir = root_dir
         self.force_masks = force_masks
@@ -274,7 +230,7 @@ class _BaseFmt:
             'Please refer to the README for details on convention. ' \
             'If you are using, JSONL, you just need a dataset directory.')
 
-        self.new_dir = f"{self.root_dir}_conversion"
+        self.new_dir = conversion_dir
         os.makedirs(self.new_dir, exist_ok=True)
 
     @property
@@ -298,16 +254,30 @@ class _BaseFmt:
 
         train_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'train', 'images'),
                           annotations_directory_path=os.path.join(self.new_dir, 'train', 'labels'),
-                          data_yaml_path=os.path.join(self.new_dir, 'train_detections'))
+                          data_yaml_path=None)
         
         test_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'test', 'images'),
                           annotations_directory_path=os.path.join(self.new_dir, 'test', 'labels'),
-                          data_yaml_path=os.path.join(self.new_dir, 'test_detections'))
+                          data_yaml_path=None)
         
         if val_det:
             val_det.as_yolo(images_directory_path=os.path.join(self.new_dir, 'valid', 'images'),
                           annotations_directory_path=os.path.join(self.new_dir, 'valid', 'labels'),
-                          data_yaml_path=os.path.join(self.new_dir, 'valid_detections'))
+                          data_yaml_path=None)
+        
+        yaml_path = os.path.join(self.new_dir, 'data.yaml')
+        classes = train_det.classes
+        data_yaml = {
+            'train': os.path.join(self.new_dir, 'train', 'images'),
+            'val': os.path.join(self.new_dir, 'val', 'images') if val_det else os.path.join(self.new_dir, 'test', 'images'),
+            'test': os.path.join(self.new_dir, 'test', 'images'),
+            'nc': len(classes),
+            'names': classes
+        }
+
+        import yaml
+        with open(yaml_path, 'w') as f:
+            yaml.dump(data_yaml, f)
 
     def to_pascal(self, detections_data: tuple): 
         train_det, test_det, val_det = detections_data
@@ -333,7 +303,7 @@ class _BaseFmt:
         
         if val_det:
             val_det.as_jsonl(images_directory_path=os.path.join(self.new_dir, 'dataset'), 
-                          annotations_path=os.path.join(self.new_dir, 'dataset', '_annotations_valid.jsonl'))
+                          annotations_path=os.path.join(self.new_dir, 'dataset', '_annotations.valid.jsonl'))
 
 class YOLOFmt(_BaseFmt):
     @property
@@ -419,20 +389,20 @@ class PascalFmt(_BaseFmt):
 
         train_detections = NewDetectionsDataset.from_pascal_voc(
             images_directory_path=self.train_dir,
-            annotations_path=self.train_dir,
+            annotations_directory_path=self.train_dir,
             force_masks=self.force_masks
             )
         
         test_detections = NewDetectionsDataset.from_pascal_voc(
                 images_directory_path=self.test_dir,
-                annotations_path=self.test_dir,
+                annotations_directory_path=self.test_dir,
                 force_masks=self.force_masks
                 )
 
         if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_pascal_voc(
                 images_directory_path=self.valid_dir,
-                annotations_path=self.valid_dir,
+                annotations_directory_path=self.valid_dir,
                 force_masks=self.force_masks
                 )
             
@@ -459,21 +429,18 @@ class JsonLFmt(_BaseFmt):
 
         train_detections = NewDetectionsDataset.from_jsonl(
             images_directory_path=self.dataset_dir,
-            annotations_path=os.path.join(self.dataset_dir, '_annotations.train.jsonl'),
-            force_masks=self.force_masks
+            annotations_path=os.path.join(self.dataset_dir, '_annotations.train.jsonl')
             )
 
         test_detections = NewDetectionsDataset.from_jsonl(
                 images_directory_path=self.dataset_dir,
-                annotations_path=os.path.join(self.dataset_dir, '_annotations.test.jsonl'),
-                force_masks=self.force_masks
+                annotations_path=os.path.join(self.dataset_dir, '_annotations.test.jsonl')
                 )
 
         if hasattr(self, 'valid_dir'):
             val_detections = NewDetectionsDataset.from_jsonl(
                 images_directory_path=self.dataset_dir,
-                annotations_path=os.path.join(self.dataset_dir, '_annotations.valid.jsonl'),
-                force_masks=self.force_masks
+                annotations_path=os.path.join(self.dataset_dir, '_annotations.valid.jsonl')
                 )
         
         return (train_detections, test_detections, val_detections)

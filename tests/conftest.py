@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 from unittest import mock
+from typing import Dict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -57,6 +58,23 @@ def load_tools() -> LoadTools:
         LoadTools: An instance of LoadTools.
     """
     return LoadTools()
+
+@pytest.fixture
+def load_dataset() -> Dict[str, str]:
+    """
+    Returns the respective dataset path for each tested dataset type. 
+    Use this for any tests on datasets, not datasets in the API due to 
+    their size, which can slow down testing speed.
+
+    Yields:
+        Generator[dict]: An iterable of each dataset stored in a dictionary.
+    """
+    return {
+        'coco': 'tests/data/test_datasets/coco_stuff',
+        'jsonl': 'tests/data/test_datasets/jsonl_stuff',
+        'pascal': 'tests/data/test_datasets/pascal_stuff',
+        'yolo': 'tests/data/test_datasets/yolo_stuff'
+    }
 
 @pytest.fixture
 def baseball_tools() -> BaseballTools:

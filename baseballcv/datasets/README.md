@@ -86,9 +86,9 @@ Expected input for JSONL:
 ```
 Root/
 ├── dataset/
-|   ├── *_train.jsonl
-|   ├── *_test.jsonl
-|   ├── *_valid.jsonl (optional)
+|   ├── _annotations.train.jsonl
+|   ├── _annotations.test.jsonl
+|   ├── _annotations.valid.jsonl (optional)
 |   ├── images.jpg (rest of images)
 ```
 
