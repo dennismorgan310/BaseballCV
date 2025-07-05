@@ -1,10 +1,10 @@
 source 'https://rubygems.org'
 
 gem "jekyll", "~> 4.3.2"
-gem "just-the-docs", "0.7.0"  # Add the theme explicitly
+gem "just-the-docs", "0.7.0"
 gem "jekyll-seo-tag"
 
-# Add missing gems for Ruby 3.4.0+ compatibility
+# Required gems for Ruby compatibility
 gem "csv"
 gem "logger"
 gem "ostruct"
