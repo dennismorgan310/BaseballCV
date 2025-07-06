@@ -4,7 +4,7 @@ import requests
 import polars as pl
 import pandas as pd
 from unittest.mock import patch, Mock
-from baseballcv.functions.savant_scraper import BaseballSavVideoScraper
+from baseballcv.functions import BaseballSavVideoScraper
 from baseballcv.functions.utils.savant_utils.crawler import Crawler
 from baseballcv.functions.utils.savant_utils.gameday import GamePlayIDScraper
 

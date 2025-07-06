@@ -1,11 +1,8 @@
-import shutil
 import pytest
 import torch
 import os
-import tempfile
 import psutil
 from PIL import Image
-from huggingface_hub.utils import GatedRepoError
 from baseballcv.model import Florence2
 
 class TestFlorence2:
@@ -18,8 +15,8 @@ class TestFlorence2:
     object detection.
     """
 
-    @pytest.fixture
-    def setup_florence2_test(self, load_tools) -> dict:
+    @pytest.fixture(scope='module')
+    def setup_florence2_test(self, load_dataset, tmp_path_factory) -> dict:
         """
         Set up test environment with real dataset.
         
@@ -31,7 +28,7 @@ class TestFlorence2:
         Args:
             load_tools: Fixture providing tools to load datasets
             
-        Yields:
+        Returns:
             dict: A dictionary containing test resources including:
                 - test_image: PIL Image object for testing
                 - test_image_path: Path to the test image
@@ -46,78 +43,47 @@ class TestFlorence2:
             pytest.skip: If requirements for testing are not met for memory reasons
         """
         
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = str(tmp_path_factory.mktemp('florence2'))
         ram = psutil.virtual_memory().total / (1024**3)  
         
         if ram < 16:
             pytest.skip("Skipping Florence2 tests: insufficient memory (likely needs 16GB machine)")
 
-        try:
-            dataset_path = load_tools.load_dataset("baseball_rubber_home_glove")
-            
-            test_tasks = [
-                "<CAPTION>",
-                "<VQA>",
-                "<OD>"
-            ]
-            
-            test_questions = [
-                "What objects are in this image?",
-                "Is there a baseball in the image?"
-            ]
-            
-            model_params = {
-                'model_id': 'microsoft/Florence-2-large',
-                'batch_size': 1,
-                'model_run_path': os.path.join(temp_dir, 'florence2_test_run')
-            }
-
-            model = Florence2(**model_params)
-            
-            # Get a test image from the dataset
-            test_image_path = os.path.join(dataset_path, "images", os.listdir(os.path.join(dataset_path, "images"))[0])
-            test_image = Image.open(test_image_path)
-            
-            yield {
-                'test_image': test_image,
-                'test_image_path': test_image_path,
-                'test_tasks': test_tasks,
-                'test_questions': test_questions,
-                'dataset_path': dataset_path,
-                'model_params': model_params,
-                'temp_dir': temp_dir,
-                'model': model
-            }
-            
-        except Exception: #if for some reason the Dataset download fails...
-            test_image_path = os.path.join(temp_dir, "test_image.jpg")
-            test_image = Image.new('RGB', (224, 224), color='white')
-            test_image.save(test_image_path)
-            
-            model_params = {
-                'model_id': 'microsoft/Florence-2-large',
-                'batch_size': 1,
-                'model_run_path': os.path.join(temp_dir, 'florence2_test_run')
-            }
-            
-            model = Florence2(**model_params)
-            
-            yield {
-                'test_image': test_image,
-                'test_image_path': test_image_path,
-                'test_tasks': ["<CAPTION>"],
-                'test_questions': ["What is in this image?"],
-                'dataset_path': None,
-                'model_params': model_params,
-                'temp_dir': temp_dir,
-                'model': model
-            }
+        dataset_path = load_dataset['yolo']
         
-        finally:
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
-            if 'dataset_path' in locals() and dataset_path and os.path.exists(dataset_path):
-                shutil.rmtree(dataset_path)
+        test_tasks = [
+            "<CAPTION>",
+            "<VQA>",
+            "<OD>"
+        ]
+        
+        test_questions = [
+            "What objects are in this image?",
+            "Is there a bat in the image?"
+        ]
+        
+        model_params = {
+            'model_id': 'microsoft/Florence-2-base',
+            'batch_size': 1,
+            'model_run_path': os.path.join(temp_dir, 'florence2_test_run')
+        }
+
+        model = Florence2(**model_params)
+        
+        # Get a test image from the dataset
+        test_image_path = 'tests/data/test_datasets/yolo_stuff/train/images/000014_jpg.rf.5901e1f930ba4405b68394265eb5886c.jpg'
+        test_image = Image.open(test_image_path)
+        
+        return {
+            'test_image': test_image,
+            'test_image_path': test_image_path,
+            'test_tasks': test_tasks,
+            'test_questions': test_questions,
+            'dataset_path': dataset_path,
+            'model_params': model_params,
+            'temp_dir': temp_dir,
+            'model': model
+        }
 
     def test_model_initialization(self, setup_florence2_test) -> None:
         """
@@ -136,7 +102,7 @@ class TestFlorence2:
             - When MPS is available and CUDA is not, model should select MPS device
         """
         
-        model_init = Florence2(**setup_florence2_test['model_params'])
+        model_init = setup_florence2_test['model']
         assert model_init is not None, "Florence2 model should initialize"
         assert hasattr(model_init, 'device'), "Model should have device attribute"
             
@@ -216,6 +182,10 @@ class TestFlorence2:
             - Result should include bounding boxes and corresponding labels
         """
         try:    
+            import matplotlib
+            matplotlib.use('Agg') # prevents plot from showing up in GUI windows
+            import matplotlib.pyplot as plt
+
             model = setup_florence2_test['model']
             
             viz_dir = os.path.join(setup_florence2_test['temp_dir'], 'visualizations')
@@ -228,12 +198,15 @@ class TestFlorence2:
                 image_path=setup_florence2_test['test_image_path'],
                 task="<OD>"
             )
+
+            plt.close('all') # backup close all figures that may be shown
                 
             assert result is not None, "OD inference should return a result"
                 
             assert isinstance(result, dict), "OD result should be a dictionary"
             assert "bboxes" in result, "OD result should include bounding boxes"
             assert "labels" in result, "OD result should include labels"
+
         except Exception as e:
             pytest.skip(f"Object detection inference test skipped: {str(e)}")
 

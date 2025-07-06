@@ -76,7 +76,7 @@ def baseball_tools() -> BaseballTools:
     """
     return BaseballTools()
 
-@pytest.fixture
+@pytest.fixture(scope='session') # Only run once
 def logger() -> BaseballCVLogger:
     """
     Creates and returns a BaseballCVLogger instance that can be used in tests

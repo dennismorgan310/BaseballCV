@@ -1,8 +1,8 @@
 import pytest
 import os
 import tempfile
-from baseballcv.functions.dataset_tools import DataTools
-from baseballcv.functions.load_tools import LoadTools
+from baseballcv.functions import DataTools
+from baseballcv.functions import LoadTools
 
 class TestDatasetTools:
     """ Test class for various Dataset Generation Tools """
