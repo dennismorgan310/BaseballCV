@@ -31,7 +31,7 @@ class TestSavantScraper:
     some background tasks that assure that the rate limit prevention methods for the
     API calls are working as expected.
     """
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup(self, tmp_path_factory) -> dict:
         temp_dir = tmp_path_factory.mktemp('savant_scraper')
         return {'temp_dir': str(temp_dir)}
@@ -63,7 +63,7 @@ class TestSavantScraper:
         assert start_dt == test_end_dt, "The dates should be swapped"
         assert os.path.exists(scraper.download_folder), "A Download Folder should be created"
     
-    @pytest.mark.network
+    # Network call that's fine
     def test_video_names(self, setup):
         """
         Tests the naming convention of the `download_folder` videos and the DataFrames returned are
@@ -94,7 +94,7 @@ class TestSavantScraper:
 
         download_folder = scraper.download_folder
         output_dir = os.listdir(download_folder)
-        assert len(output_dir) <= 20, "There should be at most 20 returned videos"
+        assert len(output_dir) <= 10, "There should be at most 10 returned videos"
 
         # Because threadpool is random with the executions, I have to manually search for the game pk, yikes
         found = False
@@ -157,7 +157,8 @@ class TestSavantScraper:
             assert response.status_code == 200, "The 3rd request should be successful."
             assert mock_get.call_count == 3, "Mock get should be called 3 times."
 
-    @pytest.mark.network
+
+    # Network call that's fine
     def test_teams_players_pitch_types(self):
         """
         Tests for various parameter entry such as the teams, players, and pitch types.

@@ -8,7 +8,7 @@ from baseballcv.datasets import JSONLDetection
 
 class TestJSONLDetection:
 
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup(self, load_dataset) -> Tuple[list[dict], str, str, logging.Logger, str]:
         """Set up and download BaseballCV JSONL dataset for testing
         

@@ -1,16 +1,9 @@
 import pytest
-import multiprocessing as mp
-from unittest.mock import Mock
-import requests
-from baseballcv.functions import LoadTools, BaseballTools
-from baseballcv.utilities import BaseballCVLogger
 import os
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import sys
-from unittest import mock
 from typing import Dict
+import multiprocessing as mp
+from baseballcv.utilities import BaseballCVLogger
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,20 +24,6 @@ def setup_multiprocessing() -> None:
     
     return None
 
-@pytest.fixture
-def load_tools() -> LoadTools:
-    """
-    Provides a LoadTools instance for testing.
-    
-    Creates and returns a LoadTools object that can be used in tests to load
-    datasets, models, and other resources needed for testing the baseballcv
-    package functionality.
-
-    Returns:
-        LoadTools: An instance of LoadTools.
-    """
-    return LoadTools()
-
 @pytest.fixture(scope='session') # Only run once
 def load_dataset() -> Dict[str, str]:
     """
@@ -62,20 +41,6 @@ def load_dataset() -> Dict[str, str]:
         'yolo': 'tests/data/test_datasets/yolo_stuff'
     }
 
-@pytest.fixture
-def baseball_tools() -> BaseballTools:
-    """
-    Provides a BaseballTools instance for testing.
-    
-    Creates and returns a BaseballTools object that can be used in tests
-    to verify the functionality of baseball-specific data processing and
-    analysis tools provided by the baseballcv package.
-
-    Returns:
-        BaseballTools: An instance of BaseballTools.
-    """
-    return BaseballTools()
-
 @pytest.fixture(scope='session') # Only run once
 def logger() -> BaseballCVLogger:
     """
@@ -86,60 +51,6 @@ def logger() -> BaseballCVLogger:
         BaseballCVLogger: An instance of BaseballCVLogger.
     """
     return BaseballCVLogger.get_logger("TestLogger")
-
-@pytest.fixture
-def mock_responses() -> tuple:
-    """
-    Provides mock HTTP responses for testing network requests.
-    
-    Creates and returns two mock response objects:
-    1. A success response (200) with mock file content and headers
-    2. An error response (404) that raises an HTTPError when raise_for_status is called
-    
-    These mock responses can be used to test functions that make HTTP requests
-    without actually connecting to external services.
-
-    Returns:
-        tuple: A tuple containing (success_response, error_response) mock objects.
-    """
-    success = Mock()
-    success.status_code = 200
-    success.content = b"mock file content"
-    success.headers = {"Content-Disposition": "attachment; filename=model.pt"}
-    success.raise_for_status.return_value = None  
-
-    # Create error response
-    error = Mock()
-    error.status_code = 404
-    error.json.return_value = {"error": "File not found"}
-    http_error = requests.exceptions.HTTPError("404 Client Error: Not Found")
-    http_error.response = error  
-    error.raise_for_status.side_effect = http_error  
-
-    return success, error
-
-@pytest.fixture
-def mock_model() -> Mock:
-    """
-    Provides a mock model for testing.
-    
-    Creates and returns a mock model object that can be used in tests to
-    verify the functionality of model training and evaluation.
-
-    Returns:
-        Mock: A mock model object.
-    """
-    class MockModel(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.vision_model = mock.MagicMock()
-            self.vision_model.encoder = mock.MagicMock()
-            self.linear = nn.Linear(10, 2)
-            
-        def forward(self, pixel_values):
-            return {"logits": torch.rand(1, 2)}
-        
-    return MockModel()
 
 @pytest.fixture
 def reset_logger_registry():

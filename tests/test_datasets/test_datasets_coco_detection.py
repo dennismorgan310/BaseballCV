@@ -8,7 +8,7 @@ from baseballcv.datasets import CocoDetectionDataset
 
 class TestCocoDetectionDataset:
 
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup(self, load_dataset) -> Generator[Tuple[str, DetrImageProcessor], Any, None]:
         """Download and set up the actual COCO dataset provided by BaseballCV for testing
         

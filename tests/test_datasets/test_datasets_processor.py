@@ -4,10 +4,9 @@ import json
 import logging
 from typing import Tuple
 from baseballcv.datasets import DataProcessor
-
 @pytest.mark.skip(reason="Appears outdated with the new Translator class. Class needs to be refined anyways")
 class TestDataProcessor:
-    @pytest.fixture
+    @pytest.fixture(scope='class')
     def setup_data_processor_and_dataset(self, load_dataset) -> Tuple[DataProcessor, str, dict]:
         """Set up a DataProcessor instance and temporary directories
         
@@ -57,7 +56,7 @@ class TestDataProcessor:
         for split in ["train", "test", "valid"]:
             assert os.path.exists(os.path.join(processed_dataset_path, split, "images"))
             assert os.path.exists(os.path.join(processed_dataset_path, split, "labels"))
-    
+            
     def test_convert_annotations(self, setup_data_processor_and_dataset) -> None:
         """Test convert_annotations method
         

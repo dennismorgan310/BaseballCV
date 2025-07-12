@@ -7,7 +7,7 @@ from baseballcv.functions import LoadTools
 class TestDatasetTools:
     """ Test class for various Dataset Generation Tools """
 
-    @pytest.fixture(scope='module') # Only run this once
+    @pytest.fixture(scope='class') # Only run this once
     def setup(self, tmp_path_factory) -> str:
         """ Sets up the environment for Dataset Tools"""
     
