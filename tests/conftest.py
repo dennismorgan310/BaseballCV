@@ -2,6 +2,8 @@ import pytest
 import os
 import sys
 from typing import Dict
+from unittest.mock import Mock
+import requests
 import multiprocessing as mp
 from baseballcv.utilities import BaseballCVLogger
 
@@ -23,6 +25,37 @@ def setup_multiprocessing() -> None:
         mp.set_start_method('spawn', force=True)
     
     return None
+
+@pytest.fixture(scope='session')
+def mock_responses() -> tuple:
+    """
+    Provides mock HTTP responses for testing network requests.
+    
+    Creates and returns two mock response objects:
+    1. A success response (200) with mock file content and headers
+    2. An error response (404) that raises an HTTPError when raise_for_status is called
+    
+    These mock responses can be used to test functions that make HTTP requests
+    without actually connecting to external services.
+
+    Returns:
+        tuple: A tuple containing (success_response, error_response) mock objects.
+    """
+    success = Mock()
+    success.status_code = 200
+    success.content = b"mock file content"
+    success.headers = {"Content-Disposition": "attachment; filename=model.pt"}
+    success.raise_for_status.return_value = None  
+
+    # Create error response
+    error = Mock()
+    error.status_code = 404
+    error.json.return_value = {"error": "File not found"}
+    http_error = requests.exceptions.HTTPError("404 Client Error: Not Found")
+    http_error.response = error  
+    error.raise_for_status.side_effect = http_error  
+
+    return success, error
 
 @pytest.fixture(scope='session') # Only run once
 def load_dataset() -> Dict[str, str]:

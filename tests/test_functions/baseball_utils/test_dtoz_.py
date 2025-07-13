@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from baseballcv.functions.utils import DistanceToZone
 
-@pytest.skip('Test not needed for now')
+@pytest.mark.skip('Test not needed for now')
 def test_distance_to_zone(tmp_path):
         """
         Tests the distance_to_zone method of BaseballTools.

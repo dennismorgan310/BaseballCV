@@ -1,15 +1,14 @@
 import pytest
 import torch
 import os
-import tempfile
 from PIL import Image
 import psutil
 from baseballcv.model import PaliGemma2
 from huggingface_hub import login
 from huggingface_hub.utils import GatedRepoError, LocalEntryNotFoundError
-import shutil
 from typing import Generator
 
+# TODO: Create a HF token for loading in this model
 class TestPaliGemma2:
     """
     Test cases for PaliGemma2 model.
@@ -19,8 +18,8 @@ class TestPaliGemma2:
     both text-to-text and object detection tasks.
     """
     
-    @pytest.fixture
-    def setup_paligemma_test(self, load_tools) -> Generator[dict, None, None]:
+    @pytest.fixture(scope='class')
+    def setup_paligemma_test(self, load_dataset, tmp_path_factory) -> Generator[dict, None, None]:
         """
         Set up test environment for PaliGemma2.
         
@@ -45,7 +44,7 @@ class TestPaliGemma2:
         Raises:
             pytest.skip: If requirements for testing are not met (memory, authentication)
         """
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = str(tmp_path_factory.mktemp('paligemma'))
         ram = psutil.virtual_memory().total / (1024**3) 
         hf_token = os.environ.get("HF_TOKEN")
 
@@ -79,11 +78,7 @@ class TestPaliGemma2:
                 else:
                     raise e
                 
-            dataset_path = load_tools.load_dataset(
-                    dataset_alias="amateur_hitter_pitcher_jsonl", 
-                    use_bdl_api=False, 
-                    file_txt_path="datasets/JSONL/amateur_hitter_pitcher_jsonl.txt"
-                )
+            dataset_path = load_dataset['jsonl']
             
             images_dir = os.path.join(dataset_path, "dataset")
             test_image_path = None
@@ -107,10 +102,8 @@ class TestPaliGemma2:
             ]
             
             class_mapping = {
-                0: 'glove',
-                1: 'homeplate',
-                2: 'baseball',
-                3: 'rubber'
+                0: 'Bat',
+                1: 'Player',
             }
     
             
@@ -132,12 +125,6 @@ class TestPaliGemma2:
             test_image.save(test_image_path)
             
             pytest.skip(f"Skipping PaliGemma2 tests due to setup error: {str(e)}")
-        
-        finally:
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
-            if 'dataset_path' in locals() and locals()['dataset_path'] and os.path.exists(locals()['dataset_path']):
-                shutil.rmtree(locals()['dataset_path'])
 
 
     def test_model_initialization(self, setup_paligemma_test) -> None:

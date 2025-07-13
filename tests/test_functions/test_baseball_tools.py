@@ -1,5 +1,6 @@
-import os
 import pytest
+import os
+import shutil
 import pandas as pd
 from unittest.mock import patch   
 from baseballcv.functions import BaseballTools
@@ -24,10 +25,9 @@ class TestBaseballTools:
         assert isinstance(results[0], dict)
 
     @pytest.mark.parametrize("mode", ["regular", "batch", "scrape", "idk"])
-    @patch('baseballcv.functions.utils.baseball_utils.glove_tracker.GloveTracker.__init__', return_value = None)
     @patch('baseballcv.functions.utils.baseball_utils.glove_tracker.GloveTracker.track_video')
     @patch('baseballcv.functions.savant_scraper.BaseballSavVideoScraper')
-    def test_glove_tracker(self, mock_scraper, mock_track, mock_glove_track_init, mode, tmp_path_factory):
+    def test_glove_tracker(self, mock_scraper, mock_track, mode, tmp_path_factory):
         """
         Tests the track_gloves method of BaseballTools in different modes.
         
@@ -51,9 +51,9 @@ class TestBaseballTools:
         if mode == 'regular':
             mock_track.return_value = "/path/to/output_video.mp4"
             regular_dir = tmp_path_factory.mktemp('regular')
-            mock_video_file = regular_dir / 'test_video.mp4'
+            mock_video_file = os.path.join(regular_dir, 'test_video.mp4')
 
-            with open(mock_video_file) as f:
+            with open(mock_video_file, 'wb') as f:
                 f.write(b'mock video content')
             
             with patch('baseballcv.functions.utils.baseball_utils.glove_tracker.GloveTracker.analyze_glove_movement') as mock_analyze:
@@ -74,7 +74,7 @@ class TestBaseballTools:
                         f.write("frame_idx,glove_center_x,glove_center_y\n1,100,200\n2,101,201\n")
                         
                     results = BaseballTools().track_gloves(
-                        mode="regular", 
+                        mode=mode, 
                         video_path=mock_video_file, 
                         output_path=regular_dir, 
                         confidence_threshold=0.25, 
@@ -132,7 +132,7 @@ class TestBaseballTools:
                 }
                 
                 results = BaseballTools().track_gloves(
-                    mode="batch", 
+                    mode=mode, 
                     input_folder=batch_dir, 
                     output_path=batch_dir,
                     max_workers=1,
@@ -197,7 +197,7 @@ class TestBaseballTools:
                     f.write("frame_idx,video_filename,glove_x,glove_y\n1,video_1.mp4,100,200\n")
                 
                 results = BaseballTools().track_gloves(
-                    mode="scrape", 
+                    mode=mode, 
                     start_date="2024-05-01", 
                     end_date="2024-05-01",
                     max_videos=3, 
@@ -236,7 +236,8 @@ class TestBaseballTools:
             assert isinstance(results, dict), 'Results should still be a dictionary'
             assert results.get('error', None) is not None, 'Should be an error message'
 
-        os.remove('glove_tracking_results')
+        if os.path.exists('glove_tracking_results'):
+            shutil.rmtree('glove_tracking_results')
 
 
     @patch('baseballcv.functions.utils.baseball_utils.command_analyzer.CommandAnalyzer.analyze_folder')
