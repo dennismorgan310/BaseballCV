@@ -6,10 +6,27 @@ from unittest.mock import patch
 from baseballcv.functions import BaseballTools
 
 class TestBaseballTools:
+    """
+    Test suite for the `BaseballTools` class.
+
+    This suite tests the various functionality of how CV is integrated into baseball
+    video. 
+    """
     
     @patch('baseballcv.functions.utils.baseball_utils.distance_to_zone.DistanceToZone.__init__', return_value=None)
     @patch('baseballcv.functions.utils.baseball_utils.distance_to_zone.DistanceToZone.analyze')
     def test_distance_to_zone(self, mock_analyze, mock_dtoz_init):
+        """
+        Tests the Distance to Zone function
+
+        Args:
+            mock_analyze: A mock of the analyze function for the `DistancetoZone` class
+            mock_dtoz_init: A mock of the instantiation for the `DistancetoZone` class
+
+        The following are tested for in this test case:
+        - Results from the mock are properly returned
+        - The results are a list of dictionaries
+        """
         mock_analyze.return_value = [{
                 'game_pk': 1, 
                 'play_id': 'a',
@@ -26,24 +43,29 @@ class TestBaseballTools:
 
     @pytest.mark.parametrize("mode", ["regular", "batch", "scrape", "idk"])
     @patch('baseballcv.functions.utils.baseball_utils.glove_tracker.GloveTracker.track_video')
-    @patch('baseballcv.functions.savant_scraper.BaseballSavVideoScraper')
+    @patch('baseballcv.functions.baseball_tools.BaseballSavVideoScraper')
     def test_glove_tracker(self, mock_scraper, mock_track, mode, tmp_path_factory):
         """
-        Tests the track_gloves method of BaseballTools in different modes.
+        Tests the track_gloves method of `BaseballTools` in different modes.
         
         This test verifies that the track_gloves method correctly handles:
         1. Regular mode: Processing a single video file
         2. Batch mode: Processing multiple video files in a directory
         3. Scrape mode: Downloading and processing videos from Baseball Savant
+        4. An invalid mode
         
         Each mode is tested for proper initialization, processing, and result formatting.
         
         Args:
             mock_scraper: Mocked BaseballSavVideoScraper to avoid actual network calls
-            mock_track_video: Mocked track_video method to avoid actual video processing
-            mock_video_file: Fixture providing a mock video file
-            baseball_tools: BaseballTools fixture
+            mock_track: Mocked track_video method to avoid actual video processing
             mode: Test parameter indicating which mode to test ("regular", "batch", or "scrape")
+            tmp_path_factory: The temp path directory for creating temp folders
+
+        The following are tested for in this test case:
+        - Results are the proper data type, dictionary
+        - Files are being written correctly
+        - For the scrape test case, only the recursive function and the savant functions are mocked
         """
 
         assert mode in ["regular", "batch", "scrape", "idk"], 'Expecting these modes'
@@ -95,41 +117,40 @@ class TestBaseballTools:
         
         elif mode == 'batch':
             batch_dir = tmp_path_factory.mktemp('batch')
-
-            mock_scraper_instance = mock_scraper.return_value
-            mock_scraper_instance.run_executor.return_value = None
             
             video_files = [os.path.join(batch_dir, f"video_{i}.mp4") for i in range(3)]
             for vf in video_files:
                 with open(vf, 'wb') as f:
                     f.write(b'mock video content')
+
+            output_video = video_files[2]  # Just select the third one for simplicity
+            csv_filename = os.path.splitext(os.path.basename(output_video))[0] + "_tracking.csv"
+            results_dir = 'glove_tracking_results'
+            os.makedirs(results_dir, exist_ok=True)
+            csv_path = os.path.join(results_dir, csv_filename)
+            # TODO: Make these values more realistic to make sure logic is realistic, for now these make the tests pass
+            with open(csv_path, 'w') as f:
+                f.write("glove_real_x,glove_real_y,baseball_real_x,homeplate_center_x\n0.45,1.23,0.88,4.23\n0.65,2.21,0.89,1.88")
+
+            summary_path = os.path.join(batch_dir, "summary.csv")
+            with open(summary_path, 'w') as f:
+                f.write("video,total_distance\nvideo_1.mp4,42.5\nvideo_2.mp4,38.2\n")
             
-            with patch('baseballcv.functions.baseball_tools.BaseballTools.track_gloves') as mock_track_regular:
-                mock_track_regular.return_value = {
-                    "output_video": os.path.join(batch_dir, "output.mp4"),
-                    "tracking_data": os.path.join(batch_dir, "tracking.csv"),
-                    "movement_stats": {"total_distance_inches": 42.5},
-                    "heatmap": os.path.join(batch_dir, "heatmap.png")
-                }
-                
-                summary_path = os.path.join(batch_dir, "summary.csv")
-                with open(summary_path, 'w') as f:
-                    f.write("video,total_distance\nvideo_1.mp4,42.5\nvideo_2.mp4,38.2\n")
-                
-                heatmap_path = os.path.join(batch_dir, "combined_heatmap.png")
-                with open(heatmap_path, 'wb') as f:
-                    f.write(b'mock heatmap content')
-                
-                combined_csv = os.path.join(batch_dir, "combined_data.csv")
-                with open(combined_csv, 'w') as f:
-                    f.write("frame_idx,video_filename,glove_x,glove_y\n1,video_1.mp4,100,200\n")
-                
-                mock_track_regular.side_effect = lambda **kwargs: {
-                    "output_video": os.path.join(batch_dir, "output.mp4"),
-                    "tracking_data": os.path.join(batch_dir, "tracking.csv"),
-                    "movement_stats": {"total_distance_inches": 42.5},
-                    "heatmap": os.path.join(batch_dir, "heatmap.png")
-                }
+            heatmap_path = os.path.join(batch_dir, "combined_heatmap.png")
+            with open(heatmap_path, 'wb') as f:
+                f.write(b'mock heatmap content')
+            
+            combined_csv = os.path.join(batch_dir, "combined_data.csv")
+            with open(combined_csv, 'w') as f:
+                f.write("frame_idx,video_filename,glove_x,glove_y\n1,video_1.mp4,100,200\n")
+            
+            df = pd.read_csv(csv_path)
+
+            with patch('baseballcv.functions.utils.baseball_utils.GloveTracker.track_video') as mock_track_regular, \
+                patch('pandas.read_csv') as mock_read_csv:
+
+                mock_track_regular.return_value = output_video
+                mock_read_csv.return_value = df
                 
                 results = BaseballTools().track_gloves(
                     mode=mode, 
@@ -165,17 +186,20 @@ class TestBaseballTools:
         elif mode == 'scrape':
             scrape_dir = tmp_path_factory.mktemp('scrape')
 
-            mock_instance = mock_scraper.return_value
-            mock_instance.run_executor.return_value = None
-            mock_instance.get_play_ids_df.return_value = pd.DataFrame({
-                'game_pk': [1, 2, 3],
-                'play_id': ['a', 'b', 'c'],
-                'pitch_type': ['FF', 'SL', 'CH'],
-                'zone': [1, 2, 3]
-            })
+            tools = BaseballTools()
+            tools_call = BaseballTools.track_gloves.__get__(tools)
+
+            mock_scraper_instance = mock_scraper.return_value
+            mock_scraper_instance.run_executor.return_value = None
+            mock_scraper_instance.get_play_ids_df.return_value = pd.DataFrame({
+                    'game_pk': [1, 2, 3],
+                    'play_id': ['a', 'b', 'c'],
+                    'pitch_type': ['FF', 'SL', 'CH'],
+                    'zone': [1, 2, 3]
+                })
             
-            with patch('baseballcv.functions.baseball_tools.BaseballTools.track_gloves') as mock_track_batch:
-                mock_track_batch.return_value = {
+            with patch('baseballcv.functions.baseball_tools.BaseballTools.track_gloves') as mock_recursive_call:
+                mock_recursive_call.return_value = {
                     "processed_videos": 3,
                     "summary_file": os.path.join(scrape_dir, "summary.csv"),
                     "combined_heatmap": os.path.join(scrape_dir, "combined_heatmap.png"),
@@ -196,20 +220,24 @@ class TestBaseballTools:
                 with open(combined_csv, 'w') as f:
                     f.write("frame_idx,video_filename,glove_x,glove_y\n1,video_1.mp4,100,200\n")
                 
-                results = BaseballTools().track_gloves(
-                    mode=mode, 
-                    start_date="2024-05-01", 
-                    end_date="2024-05-01",
-                    max_videos=3, 
-                    output_path=scrape_dir,
-                    delete_after_processing=False, 
-                    skip_confirmation=True, 
-                    create_video=True, 
-                    max_workers=1,
-                    generate_heatmap=True,
-                    suppress_detection_warnings=True
-                )
+                results = tools_call(
+                        mode=mode,
+                        start_date='2024-05-01',
+                        end_date='2024-05-01',
+                        max_videos=3,
+                        output_path='/tmp/scrape_dir',
+                        delete_after_processing=False,
+                        skip_confirmation=True,
+                        create_video=True,
+                        max_workers=1,
+                        generate_heatmap=True,
+                        suppress_detection_warnings=True
+                    )
                 
+                mock_recursive_call.assert_called_once(), "The `track_gloves` function should only be called once"
+                mock_scraper_instance.run_executor.assert_called_once(), "Mock run executor should be called"
+                mock_scraper_instance.get_play_ids_df.assert_called_once(), "Mock get play ids df should be called"
+
                 if "statcast_data_added" not in results:
                     results["statcast_data_added"] = True
                 
@@ -242,6 +270,16 @@ class TestBaseballTools:
 
     @patch('baseballcv.functions.utils.baseball_utils.command_analyzer.CommandAnalyzer.analyze_folder')
     def test_pitch_command_analyzer(self, mock_analyze_folder, tmp_path_factory):
+        """
+        Tests the command_analyzer function
+
+        Args:
+            mock_analyze_folder: Mock of the analyze_folder function in `CommandAnalyzer` class
+            tmp_path_factory: The temp path directory for creating temp folders
+
+        The following are tested for in this test case:
+        - The results are in the proper format (DataFrame), and exist
+        """
 
         mock_analyze_folder.return_value = pd.DataFrame(
             {

@@ -30,26 +30,63 @@ To run tests with coverage reporting:
 pytest --cov=baseballcv tests/ --cov-report=xml
 ```
 
-## Test Files
+## Test Suite
 
+### Main
 | File | Description |
 |------|-------------|
 | `test_imports.py` | Verifies all package modules can be imported correctly |
+
+### Functions
+| File | Description |
+|------|-------------|
 | `test_load_tools.py` | Tests model and dataset loading functionality |
 | `test_baseball_tools.py` | Tests baseball-specific analysis tools |
-| `test_baseballcv_api.py` | Tests API interactions with BallDataLab |
 | `test_dataset_tools.py` | Tests dataset generation and annotation |
 | `test_savant_scraper.py` | Tests Baseball Savant video scraping |
+| `test_command_analyzer.py` | Tests the Command Analyzer class for BaseballTools |
+| `test_dtoz.py` | Tests the Distance to Zone class for BaseballTools |
+| `test_glove_tracker.py` | Tests the Glove Tracker class for BaseballTools |
+
+### Datasets
+| File | Description |
+|------|-------------|
+| `test_datasets_coco_detection.py` | Tests the coco dataset implementation and functionality |
+| `test_datasets_jsonl_detection.py` | Tests the jsonl dataset implementation and functionality |
+| `test_dataset_processor.py` | Tests the dataset processing |
+| `test_datasets_translator.py` | Tests the dataset translator over multiple dataset types |
+| `test_jsonl.py` | Tests the JSONL manual implementation for the Dataset Translator class |
+
+### Models
+| File | Description |
+|------|-------------|
+| `test_detr.py` | Tests the detr model implementation, training, and finetuning |
+| `test_florence2.py` | Tests the florence2 model implementation, training, and finetuning |
+| `test_model_function_utils.py` | Tests the different functionality and maniuplation techniques for processing datasets and models | 
+| `test_paligemma.py` | Tests the paligemma model implementation, training, and finetuning |
+| `test_rfdetr.py` | Tests the roboflow's detr model implementation, training, and finetuning |
+| `test_yolov9.py` | Tests the yolov9 model implementation, training, and finetuning |
+
+### Utilities
+| File | Description |
+|------|-------------|
+| `test_baseballcv_logger.py` | Tests the custom logging class |
+| `test_baseballcv_prog_bar.py` | Tests the custom progress bar |
+| `test_git_dependency_installer.py` | Tests the installation of git dependencies not published to pypi |
+
+### API
+| File | Description |
+|------|-------------|
+| `test_baseballcv_api.py` | Tests API interactions with BallDataLab |
+
 
 ## Test Fixtures
 
 The `conftest.py` file defines fixtures that are used across multiple tests:
 
 - `setup_multiprocessing`: Configures multiprocessing for tests
-- `data_tools`: Provides a DataTools instance
-- `load_tools`: Provides a LoadTools instance
-- `scraper`: Provides a BaseballSavVideoScraper instance
-- `baseball_tools`: Provides a BaseballTools instance
+- `load_dataset`: Provides example datasets for easier implementation
+- `logger`: Class instance of the BaseballCVLogger
 - `mock_responses`: Creates mock HTTP responses for API testing
 
 ## CI Integration
