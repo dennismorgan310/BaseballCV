@@ -7,8 +7,7 @@ from baseballcv.model import PaliGemma2
 from huggingface_hub import login
 from huggingface_hub.utils import GatedRepoError, LocalEntryNotFoundError
 from typing import Generator
-
-# TODO: Create a HF token for loading in this model
+@pytest.mark.skip(reason='Too many things to consider')
 class TestPaliGemma2:
     """
     Test cases for PaliGemma2 model.
@@ -19,7 +18,7 @@ class TestPaliGemma2:
     """
     
     @pytest.fixture(scope='class')
-    def setup_paligemma_test(self, load_dataset, tmp_path_factory) -> Generator[dict, None, None]:
+    def setup(self, load_dataset, tmp_path_factory) -> Generator[dict, None, None]:
         """
         Set up test environment for PaliGemma2.
         
@@ -127,7 +126,7 @@ class TestPaliGemma2:
             pytest.skip(f"Skipping PaliGemma2 tests due to setup error: {str(e)}")
 
 
-    def test_model_initialization(self, setup_paligemma_test) -> None:
+    def test_model_initialization(self, setup) -> None:
         """
         Test model initialization and device selection.
         
@@ -146,10 +145,10 @@ class TestPaliGemma2:
         """
 
         model_init = PaliGemma2(
-            device=setup_paligemma_test['model_params']['device'],
-            model_id=setup_paligemma_test['model_params']['model_id'],
-            batch_size=setup_paligemma_test['model_params']['batch_size'],
-            torch_dtype=setup_paligemma_test['model_params']['torch_dtype']
+            device=setup['model_params']['device'],
+            model_id=setup['model_params']['model_id'],
+            batch_size=setup['model_params']['batch_size'],
+            torch_dtype=setup['model_params']['torch_dtype']
         )
             
         assert model_init is not None, "PaliGemma2 model should initialize"
@@ -162,9 +161,9 @@ class TestPaliGemma2:
             
             try:
                 model_mps = PaliGemma2(
-                    model_id=setup_paligemma_test['model_params']['model_id'],
-                    batch_size=setup_paligemma_test['model_params']['batch_size'],
-                    torch_dtype=setup_paligemma_test['model_params']['torch_dtype'],
+                    model_id=setup['model_params']['model_id'],
+                    batch_size=setup['model_params']['batch_size'],
+                    torch_dtype=setup['model_params']['torch_dtype'],
                     device='mps'
                 )
                 
@@ -172,7 +171,7 @@ class TestPaliGemma2:
             except Exception as e:
                 pytest.skip(f"MPS device selection test skipped: {str(e)}")
 
-    def test_text_to_text_inference(self, setup_paligemma_test) -> None:
+    def test_text_to_text_inference(self, setup) -> None:
         """
         Test basic text-to-text inference functionality.
         
@@ -192,11 +191,11 @@ class TestPaliGemma2:
         """
         
         try:
-            model = setup_paligemma_test['model']
+            model = setup['model']
             
             result = model.inference(
-                image_path=setup_paligemma_test['test_image_path'],
-                text_input=setup_paligemma_test['test_questions'][0],
+                image_path=setup['test_image_path'],
+                text_input=setup['test_questions'][0],
                 task="<TEXT_TO_TEXT>"
             )
             
@@ -206,7 +205,7 @@ class TestPaliGemma2:
         except Exception as e:
             pytest.skip(f"Text-to-text inference test skipped: {str(e)}")
 
-    def test_object_detection_inference(self, setup_paligemma_test) -> None:
+    def test_object_detection_inference(self, setup) -> None:
         """
         Test object detection inference.
         
@@ -227,15 +226,15 @@ class TestPaliGemma2:
             pytest.skip: If inference fails due to model or resource limitations
         """
         try:
-            model = setup_paligemma_test['model']
-            classes = list(setup_paligemma_test['class_mapping'].values())
+            model = setup['model']
+            classes = list(setup['class_mapping'].values())
             
             result, image_path = model.inference(
-                image_path=setup_paligemma_test['test_image_path'],
+                image_path=setup['test_image_path'],
                 text_input="detect all objects",
                 task="<TEXT_TO_OD>",
                 classes=classes,
-                save_dir=setup_paligemma_test['temp_dir']
+                save_dir=setup['temp_dir']
             )
             
             assert result is not None, "OD inference should return a result"

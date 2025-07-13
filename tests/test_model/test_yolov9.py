@@ -12,7 +12,7 @@ class TestYOLOv9:
     """
 
     @pytest.fixture(scope='class')
-    def setup_yolo_test(self, load_dataset, tmp_path_factory) -> dict:
+    def setup(self, load_dataset, tmp_path_factory) -> dict:
         """
         Set up test environment with BaseballCV dataset.
         
@@ -55,7 +55,7 @@ class TestYOLOv9:
             'model': model
         }
 
-    def test_model_initialization(self, setup_yolo_test) -> None:
+    def test_model_initialization(self, setup) -> None:
         """
         Test model initialization and device selection.
         
@@ -67,7 +67,7 @@ class TestYOLOv9:
             setup_yolo_test: Fixture providing test resources
         """
 
-        model = setup_yolo_test['model']
+        model = setup['model']
         
         assert model is not None, "YOLOv9 model should initialize"
         assert model.device == 'cpu', "Device should be set correctly"
@@ -82,7 +82,7 @@ class TestYOLOv9:
             except Exception as e:
                 pytest.skip(f"MPS model initialization test skipped: {str(e)}")
 
-    def test_inference(self, setup_yolo_test) -> None:
+    def test_inference(self, setup) -> None:
         """
         Test basic inference functionality.
         
@@ -93,11 +93,11 @@ class TestYOLOv9:
             setup_yolo_test: Fixture providing test resources including model and test image
         """
         
-        model = setup_yolo_test['model']
+        model = setup['model']
         
         result = model.inference(
-            source=setup_yolo_test['test_image_path'],
-            project=setup_yolo_test['temp_dir']
+            source=setup['test_image_path'],
+            project=setup['temp_dir']
         )
         
         assert result is not None, "Inference should return results"
@@ -110,7 +110,7 @@ class TestYOLOv9:
             assert len(result[0]['box']) == 4, "Box should have 4 coordinates"
                 
     
-    def test_threshold_parameters(self, setup_yolo_test) -> None:
+    def test_threshold_parameters(self, setup) -> None:
         """
         Test confidence and IoU threshold parameters.
         
@@ -122,17 +122,17 @@ class TestYOLOv9:
             setup_yolo_test: Fixture providing test resources including model and test image
         """
         
-        model = setup_yolo_test['model']
+        model = setup['model']
         
         high_conf_results = model.inference(
-            source=setup_yolo_test['test_image_path'],
-            project=setup_yolo_test['temp_dir'],
+            source=setup['test_image_path'],
+            project=setup['temp_dir'],
             conf_thres=0.9
         )
         
         low_conf_results = model.inference(
-            source=setup_yolo_test['test_image_path'],
-            project=setup_yolo_test['temp_dir'],
+            source=setup['test_image_path'],
+            project=setup['temp_dir'],
             conf_thres=0.05
         )
         

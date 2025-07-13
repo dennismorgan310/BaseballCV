@@ -5,6 +5,9 @@ import torch
 from baseballcv.model import DETR
 from baseballcv.datasets import CocoDetectionDataset
 from transformers import DetrImageProcessor
+import matplotlib
+matplotlib.use('Agg') # prevents plot from showing up in GUI windows
+import matplotlib.pyplot as plt
 
 class TestDETR:
     """
@@ -133,7 +136,8 @@ class TestDETR:
             )
             
             result = model.inference(os.path.join(setup['dataset_path'], 'train', '000001_jpg.rf.0556abf43a292c93872b93b79cc1c37d.jpg'))
-            
+            plt.close('all')
+
             assert result is not None, "Inference should return results"
             assert isinstance(result, list), "Inference should return a list"
             
@@ -174,6 +178,8 @@ class TestDETR:
                                                         conf=0.5)
             result_low_threshold = model.inference(os.path.join(setup['dataset_path'], 'train', '000001_jpg.rf.0556abf43a292c93872b93b79cc1c37d.jpg'),
                                                     conf=0.1)
+            
+            plt.close('all')
             
             assert len(result_high_threshold) <= len(result_low_threshold), \
                 "Higher threshold should result in fewer or equal number of predictions"

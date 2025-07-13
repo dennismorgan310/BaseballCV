@@ -16,7 +16,7 @@ class TestFlorence2:
     """
 
     @pytest.fixture(scope='class')
-    def setup_florence2_test(self, load_dataset, tmp_path_factory) -> dict:
+    def setup(self, load_dataset, tmp_path_factory) -> dict:
         """
         Set up test environment with real dataset.
         
@@ -85,7 +85,7 @@ class TestFlorence2:
             'model': model
         }
 
-    def test_model_initialization(self, setup_florence2_test) -> None:
+    def test_model_initialization(self, setup) -> None:
         """
         Test model initialization and device selection.
         
@@ -102,18 +102,18 @@ class TestFlorence2:
             - When MPS is available and CUDA is not, model should select MPS device
         """
         
-        model_init = setup_florence2_test['model']
+        model_init = setup['model']
         assert model_init is not None, "Florence2 model should initialize"
         assert hasattr(model_init, 'device'), "Model should have device attribute"
             
         with pytest.MonkeyPatch().context() as m:
             m.setattr(torch.cuda, 'is_available', lambda: False)
             m.setattr(torch.backends.mps, 'is_available', lambda: True)
-            model_mps = Florence2(**setup_florence2_test['model_params'])
+            model_mps = Florence2(**setup['model_params'])
             
             assert "mps" in str(model_mps.device), "Should select MPS when available and CUDA is not"
 
-    def test_caption_inference(self, setup_florence2_test) -> None:
+    def test_caption_inference(self, setup) -> None:
         """
         Test captioning inference with a real image.
         
@@ -128,17 +128,17 @@ class TestFlorence2:
             - Result should be a string representing the image caption
         """
         
-        model = setup_florence2_test['model']
+        model = setup['model']
         
         result = model.inference(
-            image_path=setup_florence2_test['test_image_path'],
+            image_path=setup['test_image_path'],
             task="<CAPTION>"
         )
         
         assert result is not None, "Caption inference should return a result"
         assert isinstance(result, str), "Caption result should be a string"
             
-    def test_vqa_inference(self, setup_florence2_test) -> None:
+    def test_vqa_inference(self, setup) -> None:
         """
         Test VQA inference with a real image.
         
@@ -155,17 +155,17 @@ class TestFlorence2:
             - Result should be a string representing the answer to the question
         """
 
-        model = setup_florence2_test['model'] 
+        model = setup['model'] 
         result = model.inference(
-            image_path=setup_florence2_test['test_image_path'],
+            image_path=setup['test_image_path'],
             task="<VQA>",
-            question=setup_florence2_test['test_questions'][0]
+            question=setup['test_questions'][0]
         )
             
         assert result is not None, "VQA inference should return a result"
         assert isinstance(result, str), "VQA result should be a string"
 
-    def test_object_detection_inference(self, setup_florence2_test) -> None:
+    def test_object_detection_inference(self, setup) -> None:
         """
         Test object detection inference with a real image.
         
@@ -186,16 +186,16 @@ class TestFlorence2:
             matplotlib.use('Agg') # prevents plot from showing up in GUI windows
             import matplotlib.pyplot as plt
 
-            model = setup_florence2_test['model']
+            model = setup['model']
             
-            viz_dir = os.path.join(setup_florence2_test['temp_dir'], 'visualizations')
+            viz_dir = os.path.join(setup['temp_dir'], 'visualizations')
             os.makedirs(viz_dir, exist_ok=True)
             
             if hasattr(model, 'model_run_path'):
                 os.makedirs(os.path.join(model.model_run_path, 'visualizations'), exist_ok=True)
             
             result = model.inference(
-                image_path=setup_florence2_test['test_image_path'],
+                image_path=setup['test_image_path'],
                 task="<OD>"
             )
 

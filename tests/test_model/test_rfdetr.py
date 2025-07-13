@@ -16,7 +16,7 @@ DUMMY_DETECTION = sv.Detections(
 class TestRFDETR:
 
     @pytest.fixture(scope='class')
-    def setup_rfdetr_test(self, load_dataset, tmp_path_factory):
+    def setup(self, load_dataset, tmp_path_factory):
         """
         Setup test environment for RFDETR tests.
         
@@ -75,7 +75,7 @@ class TestRFDETR:
             'dataset_path': dataset_path
         }
     
-    def test_model_initialization(self, setup_rfdetr_test):
+    def test_model_initialization(self, setup):
         """
         Test model initialization and device selection.
         
@@ -86,9 +86,9 @@ class TestRFDETR:
         Args:
             setup_rfdetr_test: Fixture providing test resources
         """
-        labels = setup_rfdetr_test['labels']
-        model_base = setup_rfdetr_test['model_base']
-        model_large = setup_rfdetr_test['model_large']
+        labels = setup['labels']
+        model_base = setup['model_base']
+        model_large = setup['model_large']
         
         assert model_base is not None, "RFDETR Basemodel should initialize"
         assert model_large is not None, "RFDETR Large model should initialize"
@@ -97,7 +97,7 @@ class TestRFDETR:
         assert labels is not None, "Labels should be set correctly"
 
     @patch('baseballcv.model.od.detr.rfdetr.RFDETRBase.predict', return_value = DUMMY_DETECTION)
-    def test_inference(self, mock_rf_base_predict, setup_rfdetr_test):
+    def test_inference(self, mock_rf_base_predict, setup):
         """
         Test basic inference functionality.
         
@@ -109,9 +109,9 @@ class TestRFDETR:
             setup_rfdetr_test: Fixture providing test resources including model and test image
         """
         
-        model = setup_rfdetr_test['model_base']
-        test_image_path = setup_rfdetr_test['test_image_path']
-        test_video_path = setup_rfdetr_test['test_video_path']
+        model = setup['model_base']
+        test_image_path = setup['test_image_path']
+        test_video_path = setup['test_video_path']
         
         # Test image inference
         result_image, output_image_path = model.inference(
@@ -134,7 +134,7 @@ class TestRFDETR:
         assert os.path.exists(output_image_path), "Output image should be saved"
         assert os.path.exists(output_video_path), "Output video should be saved"
 
-    def test_finetune(self, setup_rfdetr_test):
+    def test_finetune(self, setup):
         """
         Downloads RHG COCO-format dataset and verifies that the model
         can begin the training process successfully.
@@ -142,11 +142,11 @@ class TestRFDETR:
         Args:
             setup_rfdetr_test: Fixture providing test resources
         """
-        model = setup_rfdetr_test['model_base']
+        model = setup['model_base']
 
         model.finetune(
-            data_path=setup_rfdetr_test['dataset_path'],
-            output_dir=setup_rfdetr_test['output_dir'],
+            data_path=setup['dataset_path'],
+            output_dir=setup['output_dir'],
             epochs=1,
             batch_size=1,
             num_workers=0,
