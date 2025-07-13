@@ -6975,9 +6975,9 @@ tqdm = ">=4.64.0"
 
 [package.source]
 type = "git"
-url = "https://github.com/dylandru/yolov9.git"
+url = "https://github.com/BaseballCV/yolov9.git"
 reference = "HEAD"
-resolved_reference = "7ad9d5f41245c1680e568fd7d4faa6a025121bd6"
+resolved_reference = "b7b7580bd8a07fd104bd4ae639e012435ab34024"
 
 [[package]]
 name = "zipp"
@@ -7003,4 +7003,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9, !=3.9.7, <4.0"
-content-hash = "a75ae5851a566c66732f03b77dc5207ec691c4633c5e7bc77a3012b984539233"
+content-hash = "f057d9bb370571d147c008c4353987aeb6c4ad00eb60d96c7394dc94b2faebf1"

@@ -15,7 +15,7 @@ class TestModelFunctionUtils:
     updated for a variety of models, so this functionality is not yet complete.
     """
             
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup(self, tmp_path_factory) -> dict:
         """
         Set up test environment with Florence2 model.

@@ -15,7 +15,7 @@ class TestFlorence2:
     object detection.
     """
 
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup_florence2_test(self, load_dataset, tmp_path_factory) -> dict:
         """
         Set up test environment with real dataset.

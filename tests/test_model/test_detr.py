@@ -15,7 +15,7 @@ class TestDETR:
     capabilities with various confidence thresholds.
     """
 
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup(self, load_dataset, logger):
         """
         Set up test environment with real dataset.

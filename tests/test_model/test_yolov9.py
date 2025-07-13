@@ -1,9 +1,5 @@
 import pytest
 import torch
-import shutil
-import os
-import tempfile
-from PIL import Image
 from baseballcv.model import YOLOv9
 
 class TestYOLOv9:
@@ -15,8 +11,8 @@ class TestYOLOv9:
     sensitivity.
     """
 
-    @pytest.fixture
-    def setup_yolo_test(self, load_tools) -> dict:
+    @pytest.fixture(scope='class')
+    def setup_yolo_test(self, load_dataset, tmp_path_factory) -> dict:
         """
         Set up test environment with BaseballCV dataset.
         
@@ -27,7 +23,7 @@ class TestYOLOv9:
         Args:
             load_tools: Fixture providing tools to load datasets
             
-        Yields:
+        Returns:
             dict: A dictionary containing test resources including:
                 - test_image_path: Path to an image for testing inference
                 - dataset_path: Path to the loaded dataset
@@ -35,58 +31,29 @@ class TestYOLOv9:
                 - temp_dir: Path to temporary directory for test artifacts
                 - model: Initialized YOLOv9 model instance
         """
-        
-        try:
-            temp_dir = tempfile.mkdtemp()
-            dataset_path = load_tools.load_dataset("baseball_rubber_home_glove")
 
-            model = YOLOv9(
-                device='cpu'
-            ) #using default model yolov9-c
-            
-            train_images_dir = os.path.join(dataset_path, "train", "images")
-            test_image_path = None
-            
-            if os.path.exists(train_images_dir) and os.listdir(train_images_dir):
-                test_image_path = os.path.join(train_images_dir, [f for f in os.listdir(train_images_dir) 
-                                              if f.lower().endswith(('.jpg', '.jpeg', '.png'))][0])
-            
-            if not test_image_path:
-                test_image_path = os.path.join(temp_dir, "test_image.jpg")
-                Image.new('RGB', (640, 640), color='green').save(test_image_path)
-            
-            class_mapping = {
-                0: 'glove',
-                1: 'homeplate',
-                2: 'baseball',
-                3: 'rubber'
-            }
-            
-            yield {
-                'test_image_path': test_image_path,
-                'dataset_path': dataset_path,
-                'class_mapping': class_mapping,
-                'temp_dir': temp_dir,
-                'model': model
-            }
-            
-        except Exception as e:
-            print(f"Error setting up YOLOv9 test: {e}")
-            test_image_path = os.path.join(temp_dir, "test_image.jpg")
-            img = Image.new('RGB', (640, 640), color='red')
-            img.save(test_image_path)
-            
-            yield {
-                'test_image_path': test_image_path,
-                'dataset_path': None,
-                'class_mapping': {0: 'test_class'},
-                'temp_dir': temp_dir,
-                'model': model
-            }
+        temp_dir = tmp_path_factory.mktemp('yolov9')
+        dataset_path = load_dataset['yolo']
+
+        model = YOLOv9(
+            device='cpu',
+            model_path=str(temp_dir)
+        ) #using default model yolov9-c
+
+        test_image_path = 'tests/data/test_datasets/yolo_stuff/train/images/000002_jpg.rf.e107a7a3d26b698c7ff4a201f65e532b.jpg'
         
-        finally:
-            shutil.rmtree(temp_dir)
-            shutil.rmtree(dataset_path)
+        class_mapping = {
+            0: 'Bat',
+            1: 'Player'
+        }
+        
+        return {
+            'test_image_path': test_image_path,
+            'dataset_path': dataset_path,
+            'class_mapping': class_mapping,
+            'temp_dir': str(temp_dir / "weights"),
+            'model': model
+        }
 
     def test_model_initialization(self, setup_yolo_test) -> None:
         """
@@ -100,9 +67,7 @@ class TestYOLOv9:
             setup_yolo_test: Fixture providing test resources
         """
 
-        model = YOLOv9(
-            device='cpu'
-        )
+        model = setup_yolo_test['model']
         
         assert model is not None, "YOLOv9 model should initialize"
         assert model.device == 'cpu', "Device should be set correctly"
@@ -112,7 +77,7 @@ class TestYOLOv9:
             m.setattr(torch.backends.mps, 'is_available', lambda: True)
             
             try:
-                model = YOLOv9(device='mps')
+                model.device = 'mps' # Set the device of the model to mps to check if it works
                 assert model.device == 'mps', "Should select MPS when available"
             except Exception as e:
                 pytest.skip(f"MPS model initialization test skipped: {str(e)}")
@@ -161,11 +126,13 @@ class TestYOLOv9:
         
         high_conf_results = model.inference(
             source=setup_yolo_test['test_image_path'],
+            project=setup_yolo_test['temp_dir'],
             conf_thres=0.9
         )
         
         low_conf_results = model.inference(
             source=setup_yolo_test['test_image_path'],
+            project=setup_yolo_test['temp_dir'],
             conf_thres=0.05
         )
         

@@ -15,7 +15,7 @@ DUMMY_DETECTION = sv.Detections(
 )
 class TestRFDETR:
 
-    @pytest.fixture(scope='module')
+    @pytest.fixture(scope='class')
     def setup_rfdetr_test(self, load_dataset, tmp_path_factory):
         """
         Setup test environment for RFDETR tests.
