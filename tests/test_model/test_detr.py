@@ -1,9 +1,13 @@
-import shutil
 import pytest
+import os
+import shutil
 import torch
 from baseballcv.model import DETR
 from baseballcv.datasets import CocoDetectionDataset
 from transformers import DetrImageProcessor
+import matplotlib
+matplotlib.use('Agg') # prevents plot from showing up in GUI windows
+import matplotlib.pyplot as plt
 
 class TestDETR:
     """
@@ -14,8 +18,8 @@ class TestDETR:
     capabilities with various confidence thresholds.
     """
 
-    @pytest.fixture
-    def setup_detr_test(self, load_tools, logger):
+    @pytest.fixture(scope='class')
+    def setup(self, load_dataset, logger):
         """
         Set up test environment with real dataset.
         
@@ -23,7 +27,7 @@ class TestDETR:
         initializing the image processor, and preparing test images for inference.
         
         Args:
-            load_tools: Fixture providing tools to load datasets
+            load_dataset: Fixture providing tools to load datasets
             
         Yields:
             dict: A dictionary containing test resources including:
@@ -34,7 +38,14 @@ class TestDETR:
                 - image_size: Tuple containing dimensions of the test image
         """
 
-        dataset_path = load_tools.load_dataset("baseball_rubber_home_glove_COCO")
+        dataset_path = load_dataset['coco']
+        # Create dummy dataset to satisfy `CocoDetectionDataset` hierarchical structure (they're all the same),
+        # this format is just a little picky.
+        expected_pth = os.path.join(dataset_path, 'train', '_coco.json')
+
+        if not os.path.exists(expected_pth):
+            shutil.copy(os.path.join(dataset_path, 'train', '_annotations.coco.json'), expected_pth)
+
         processor = DetrImageProcessor(do_resize=True, size={"height": 800, "width": 800})
 
         split = "train"
@@ -51,10 +62,8 @@ class TestDETR:
             test_image = torch.rand(3, 224, 224)
         
         id2label = {
-            0: "glove",
-            1: "homeplate",
-            2: "baseball",
-            3: "rubber"
+            0: "Bat",
+            1: "Player",
         }
         
         yield {
@@ -64,7 +73,7 @@ class TestDETR:
             'id2label': id2label,
             'image_size': image_size
         }
-        shutil.rmtree(dataset_path) 
+        os.remove(expected_pth)
 
     @pytest.mark.network
     def test_model_initialization(self):
@@ -86,7 +95,7 @@ class TestDETR:
         model_cpu = DETR(
             model_id='facebook/detr-resnet-50',
             device='cpu',
-            num_labels=4
+            num_labels=2
         )
         
         assert model_cpu is not None, "DETR model should initialize"
@@ -95,7 +104,7 @@ class TestDETR:
         assert model_cpu.batch_size == 8, "Batch size should be set correctly"
         assert model_cpu.processor is not None, "Model should have a processor"
 
-    def test_inference(self, setup_detr_test):
+    def test_inference(self, setup):
         """
         Test basic inference functionality with a real image.
         
@@ -105,7 +114,7 @@ class TestDETR:
         fields.
         
         Args:
-            setup_detr_test: Fixture providing test resources for DETR
+            setup: Fixture providing test resources for DETR
             
         Assertions:
             - Inference should return a non-null result
@@ -113,18 +122,22 @@ class TestDETR:
             - Each detection should have score, label, and box attributes
         """
 
-        if len(setup_detr_test['coco_dataset']) == 0:
+        if len(setup['coco_dataset']) == 0:
             pytest.skip("No images available in dataset to test inference")
         
         try:
+            # TODO:
+            # The error here is an unpacking error on inference. There needs to be 6 values,
+            # not 4. Will be patched in a future ticket, enhancing DETR.
             model = DETR(
                 model_id='facebook/detr-resnet-50',
                 device='cpu',
-                num_labels=4
+                num_labels=2
             )
             
-            result = model.inference("baseball_rubber_home_glove_COCO/test/images/0000011.jpg")
-            
+            result = model.inference(os.path.join(setup['dataset_path'], 'train', '000001_jpg.rf.0556abf43a292c93872b93b79cc1c37d.jpg'))
+            plt.close('all')
+
             assert result is not None, "Inference should return results"
             assert isinstance(result, list), "Inference should return a list"
             
@@ -132,11 +145,11 @@ class TestDETR:
                 assert "score" in result[0], "Each detection should have a confidence score"
                 assert "label" in result[0], "Each detection should have a label"
                 assert "box" in result[0], "Each detection should have a bounding box"
-        
+            
         except Exception as e:
             pytest.skip(f"DETR is under construction. Error occurred: {e}")
 
-    def test_inference_with_custom_threshold(self, setup_detr_test):
+    def test_inference_with_custom_threshold(self, setup):
         """
         Test inference with a custom confidence threshold.
         
@@ -151,6 +164,9 @@ class TestDETR:
             - Higher confidence threshold should result in fewer or equal
               number of detections compared to a lower threshold
         """
+        # TODO: This test is failing due to a incorrect keyword argument: labels
+        # This will need to be patched in another ticket, updating the DETR class
+
         try:
             model = DETR(
                     model_id='facebook/detr-resnet-50',
@@ -158,8 +174,12 @@ class TestDETR:
                     num_labels=4
                 )
                 
-            result_high_threshold = model.inference("baseball_rubber_home_glove_COCO/test/images/0000011.jpg", conf=0.5)
-            result_low_threshold = model.inference("baseball_rubber_home_glove_COCO/test/images/0000011.jpg", conf=0.1)
+            result_high_threshold = model.inference(os.path.join(setup['dataset_path'], 'train', '000001_jpg.rf.0556abf43a292c93872b93b79cc1c37d.jpg'),
+                                                        conf=0.5)
+            result_low_threshold = model.inference(os.path.join(setup['dataset_path'], 'train', '000001_jpg.rf.0556abf43a292c93872b93b79cc1c37d.jpg'),
+                                                    conf=0.1)
+            
+            plt.close('all')
             
             assert len(result_high_threshold) <= len(result_low_threshold), \
                 "Higher threshold should result in fewer or equal number of predictions"

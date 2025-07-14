@@ -9,7 +9,7 @@ from typing import Optional, Union
 import shutil
 from huggingface_hub import snapshot_download, hf_hub_download
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
-from datasets import load_dataset
+import datasets
 import textwrap
 
 class LoadTools:
@@ -309,7 +309,7 @@ class LoadTools:
                         ignore_patterns=["*.md", "*.gitattributes", "*.gitignore"]
                     )
 
-                    dataset = load_dataset(repo_id, split="train")
+                    dataset = dataset.load_dataset(repo_id, split="train")
 
                     for i, example in tqdm(enumerate(dataset["train"]), total=len(dataset["train"])):
                         image, filename = example["image"], example["filename"]

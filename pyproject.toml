@@ -56,4 +56,4 @@ pytest-cov = "^6.2.1"
 
 
 [tool.poetry.group.extras.dependencies]
-yolov9 = {git = "https://github.com/dylandru/yolov9.git"}
+yolov9 = {git = "https://github.com/BaseballCV/yolov9.git"}

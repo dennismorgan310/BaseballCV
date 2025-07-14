@@ -1,16 +1,11 @@
 import pytest
-import multiprocessing as mp
+import os
+import sys
+from typing import Dict
 from unittest.mock import Mock
 import requests
-from baseballcv.functions import DataTools, LoadTools, BaseballTools
+import multiprocessing as mp
 from baseballcv.utilities import BaseballCVLogger
-import os
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import sys
-from unittest import mock
-from typing import Dict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -30,78 +25,8 @@ def setup_multiprocessing() -> None:
         mp.set_start_method('spawn', force=True)
     
     return None
-        
-@pytest.fixture
-def data_tools() -> DataTools:
-    """
-    Provides a DataTools instance for testing.
-    
-    Creates and returns a DataTools object with a reduced number of workers
-    to prevent excessive resource usage during testing while still allowing
-    parallel processing functionality to be tested.
 
-    Returns:
-        DataTools: An instance of DataTools.
-    """
-    return DataTools()
-
-@pytest.fixture
-def load_tools() -> LoadTools:
-    """
-    Provides a LoadTools instance for testing.
-    
-    Creates and returns a LoadTools object that can be used in tests to load
-    datasets, models, and other resources needed for testing the baseballcv
-    package functionality.
-
-    Returns:
-        LoadTools: An instance of LoadTools.
-    """
-    return LoadTools()
-
-@pytest.fixture
-def load_dataset() -> Dict[str, str]:
-    """
-    Returns the respective dataset path for each tested dataset type. 
-    Use this for any tests on datasets, not datasets in the API due to 
-    their size, which can slow down testing speed.
-
-    Yields:
-        Generator[dict]: An iterable of each dataset stored in a dictionary.
-    """
-    return {
-        'coco': 'tests/data/test_datasets/coco_stuff',
-        'jsonl': 'tests/data/test_datasets/jsonl_stuff',
-        'pascal': 'tests/data/test_datasets/pascal_stuff',
-        'yolo': 'tests/data/test_datasets/yolo_stuff'
-    }
-
-@pytest.fixture
-def baseball_tools() -> BaseballTools:
-    """
-    Provides a BaseballTools instance for testing.
-    
-    Creates and returns a BaseballTools object that can be used in tests
-    to verify the functionality of baseball-specific data processing and
-    analysis tools provided by the baseballcv package.
-
-    Returns:
-        BaseballTools: An instance of BaseballTools.
-    """
-    return BaseballTools()
-
-@pytest.fixture
-def logger() -> BaseballCVLogger:
-    """
-    Creates and returns a BaseballCVLogger instance that can be used in tests
-    to verify the functionality of logging and logging messages.
-
-    Returns:
-        BaseballCVLogger: An instance of BaseballCVLogger.
-    """
-    return BaseballCVLogger.get_logger("TestLogger")
-
-@pytest.fixture
+@pytest.fixture(scope='session')
 def mock_responses() -> tuple:
     """
     Provides mock HTTP responses for testing network requests.
@@ -132,28 +57,33 @@ def mock_responses() -> tuple:
 
     return success, error
 
-@pytest.fixture
-def mock_model() -> Mock:
+@pytest.fixture(scope='session') # Only run once
+def load_dataset() -> Dict[str, str]:
     """
-    Provides a mock model for testing.
-    
-    Creates and returns a mock model object that can be used in tests to
-    verify the functionality of model training and evaluation.
+    Returns the respective dataset path for each tested dataset type. 
+    Use this for any tests on datasets, not datasets in the API due to 
+    their size, which can slow down testing speed.
 
     Returns:
-        Mock: A mock model object.
+        Dict[str, str]: An iterable of each dataset stored in a dictionary.
     """
-    class MockModel(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.vision_model = mock.MagicMock()
-            self.vision_model.encoder = mock.MagicMock()
-            self.linear = nn.Linear(10, 2)
-            
-        def forward(self, pixel_values):
-            return {"logits": torch.rand(1, 2)}
-        
-    return MockModel()
+    return {
+        'coco': 'tests/data/test_datasets/coco_stuff',
+        'jsonl': 'tests/data/test_datasets/jsonl_stuff',
+        'pascal': 'tests/data/test_datasets/pascal_stuff',
+        'yolo': 'tests/data/test_datasets/yolo_stuff'
+    }
+
+@pytest.fixture(scope='session') # Only run once
+def logger() -> BaseballCVLogger:
+    """
+    Creates and returns a BaseballCVLogger instance that can be used in tests
+    to verify the functionality of logging and logging messages.
+
+    Returns:
+        BaseballCVLogger: An instance of BaseballCVLogger.
+    """
+    return BaseballCVLogger.get_logger("TestLogger")
 
 @pytest.fixture
 def reset_logger_registry():

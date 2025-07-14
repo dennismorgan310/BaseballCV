@@ -1,7 +1,5 @@
 import pytest
 import os
-import tempfile
-import shutil
 from unittest import mock
 import torch
 from baseballcv.model.utils.model_function_utils import ModelFunctionUtils
@@ -17,8 +15,8 @@ class TestModelFunctionUtils:
     updated for a variety of models, so this functionality is not yet complete.
     """
             
-    @pytest.fixture
-    def setup(self) -> dict:
+    @pytest.fixture(scope='class')
+    def setup(self, tmp_path_factory) -> dict:
         """
         Set up test environment with Florence2 model.
         
@@ -36,13 +34,14 @@ class TestModelFunctionUtils:
                 - batch_size: Batch size for testing
                 - device: Device to use for testing
         """
-        temp_dir = tempfile.mkdtemp()
-        model_run_path = os.path.join(temp_dir, 'florence2_test_run')
+        temp_dir = tmp_path_factory.mktemp('model_utils')
+        run_pth = temp_dir / 'florence2_test_run'
+        run_pth.mkdir(exist_ok=True)
         
         model_params = {
-            'model_id': 'microsoft/Florence-2-large',
+            'model_id': 'microsoft/Florence-2-base',
             'batch_size': 1,
-            'model_run_path': model_run_path
+            'model_run_path': run_pth
         }
         
         try:
@@ -55,8 +54,8 @@ class TestModelFunctionUtils:
                 'processor': processor,
                 'model': florence2,
                 'logger': logger,
-                'temp_dir': temp_dir,
-                'model_run_path': model_run_path,
+                'temp_dir': str(temp_dir),
+                'model_run_path': run_pth,
                 'batch_size': model_params['batch_size'],
                 'device': florence2.device,
                 'model_name': model_params['model_id']
@@ -64,23 +63,7 @@ class TestModelFunctionUtils:
         except Exception as e:
             pytest.skip(f"Skipping due to error initializing Florence2: {str(e)}")
     
-    def teardown_method(self, method) -> None:
-        """
-        Clean up temporary directories after test completion.
-        
-        This method iterates through all attributes of the current test instance
-        and removes any temporary directories found in dictionaries.
-        
-        Args:
-            method: The test method that was executed.
-        """
-        for attr_name in dir(self):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict) and 'temp_dir' in attr:
-                if os.path.exists(attr['temp_dir']):
-                    shutil.rmtree(attr['temp_dir'])
-    
-    def test_core_functionality(self, setup) -> None:
+    def test_core_functionality(self, setup, tmp_path) -> None:
         """
         Test essential methods of ModelFunctionUtils.
         
@@ -127,17 +110,17 @@ class TestModelFunctionUtils:
             collated = model_utils.collate_fn(batch)
             assert "pixel_values" in collated
             assert "labels" in collated
-    
-        
-        with tempfile.NamedTemporaryFile(suffix='.jsonl', delete=False, dir=setup['temp_dir']) as f:
-            f.write(b'{"image_path": "test.jpg", "boxes": [[0, 0, 100, 100]], "labels": ["test"]}\n')
+
+        jsonl_file = tmp_path / "test_file.jsonl"
+        with open(jsonl_file, 'w') as f:
+            f.write('{"image_path": "test.jpg", "boxes": [[0, 0, 100, 100]], "labels": ["test"]}\n')
         
         with mock.patch('baseballcv.model.utils.model_function_utils.JSONLDetection') as mock_dataset:
             mock_dataset_instance = mock.MagicMock()
             mock_dataset.return_value = mock_dataset_instance
             
             dataset = model_utils.create_detection_dataset(
-                jsonl_file_path=f.name,
+                jsonl_file_path=jsonl_file,
                 image_directory_path=setup['temp_dir'],
                 augment=False
             )
