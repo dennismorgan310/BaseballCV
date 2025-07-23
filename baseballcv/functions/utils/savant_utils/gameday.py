@@ -1,19 +1,19 @@
 from .crawler import Crawler
 from datetime import datetime, date
-from baseballcv.utilities import ProgressBar
-from tqdm import tqdm
+from baseballcv.utilities import ProgressBar, BaseballCVLogger
 import concurrent.futures
 from typing import List
 import polars as pl
-import logging
 
 class GamePKScraper(Crawler):
     """
     Scraping Class that focuses on scraping the game ids based on a date range. Inherits from the `Crawler` class.
     """
-    def __init__(self, start_dt: str, end_dt: str=None, team_abbr: str=None, player: int=None, logger: logging.Logger = None) -> None:
-        self.logger = logger if logger else logging.getLogger(__name__)
-        super().__init__(start_dt, end_dt, self.logger)
+    def __init__(self, start_dt: str, end_dt: str = None, 
+                 team_abbr: str = None, player: int = None) -> None:
+        self.logger = BaseballCVLogger.get_logger(self.__class__.__name__)
+
+        super().__init__(start_dt, end_dt)
         self.GAMEDAY_RANGE_URL = 'https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate={}&endDate={}&timeZone=America/New_York&gameType=E&&gameType=S&&gameType=R&&gameType=F&&gameType=D&&gameType=L&&gameType=W&&gameType=A&&gameType=C&language=en&leagueId=103&&leagueId=104&hydrate=team,flags,broadcasts(all),venue(location)&sortBy=gameDate,gameStatus,gameType'
         self.home_team, self.away_team, self.player = [], [], player
         self.corrected_teams_dict = {'CHW': 'CWS',
@@ -30,18 +30,18 @@ class GamePKScraper(Crawler):
                            'DET': 116, 'HOU': 117, 'KC': 118, 'LAD': 119, 'WSH': 120,
                            'NYM': 121}
         if self.player:
-            year = self.end_dt[0:4] # First 4 elements to get the year 
+            year = self.end_dt[:4] # First 4 elements to get the year 
             url = f'https://statsapi.mlb.com/api/v1/sports/1/players?season={year}'
             response = self.requests_with_retry(url)
             people = response.json()['people']
-            team_id = -100 # Dummy variable that should change if team id is found.
+            team_id = None # Dummy variable that should change if team id is found.
 
             for player in people:
                 if player.get('id') == self.player:
                     team_id = player.get('currentTeam')['id']
                     break
             
-            if team_id == -100:
+            if not team_id:
                 raise ValueError(f"Cannot find player ID {self.player}. Maybe a typo?")
 
             self.team_abbr = {v: k for k,v in self.recognized_abbr.items()}.get(team_id)
@@ -106,13 +106,28 @@ class GamePlayIDScraper(GamePKScraper):
     Class that extracts the play ids for each game. Inherits from the `GamePKScraper` class.
     """
 
-    def __init__(self, start_dt, end_dt=None, team_abbr=None, player = None, logger: logging.Logger = None, **kwargs) -> None:
-        self.logger = logger if logger else logging.getLogger(__name__)
-        super().__init__(start_dt, end_dt, team_abbr, player, self.logger)
+    def __init__(self, start_dt: str, end_dt: str = None, 
+                 team_abbr: str = None, player: int = None, 
+                 *,
+                 pitch_type: str = None,
+                 max_return_videos: int = 10,
+                 max_videos_per_game: int = None) -> None:
+        
+        self.logger = BaseballCVLogger.get_logger(self.__class__.__name__)
+
+        super().__init__(start_dt, end_dt, team_abbr, player)
+        if (self.end_dt_date - self.start_dt_date).days >= 45:
+            _OVERSIZE_WARN_STRING = """
+            Woah, that's a hefty request you've got there. Please consider using arguments such as 
+            `team_abbr` or `player` if you are only looking for a specific team or player to make
+            queries faster. """
+
+            self.logger.warning(_OVERSIZE_WARN_STRING)
+        
         self.GAMEDAY_URL = 'https://statsapi.mlb.com/api/v1/game/{}/playByPlay'
-        self.pitch_type = kwargs.get('pitch_type', None)
-        self.max_return_videos = kwargs.get('max_return_videos', 10)
-        self.max_videos_per_game = kwargs.get('max_videos_per_game', None)
+        self.pitch_type = pitch_type
+        self.max_return_videos = max_return_videos
+        self.max_videos_per_game = max_videos_per_game
 
         self.game_pks = super().run_executor()  
 

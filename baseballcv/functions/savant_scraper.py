@@ -1,4 +1,4 @@
-from baseballcv.functions.utils.savant_utils import GamePlayIDScraper, Crawler
+from baseballcv.functions.utils.savant_utils import GamePlayIDScraper
 import concurrent.futures
 import requests
 from bs4 import BeautifulSoup
@@ -6,43 +6,48 @@ import os
 import shutil
 import polars as pl
 import pandas as pd
+from typing import Union, List
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
 
-class BaseballSavVideoScraper(Crawler):
+class BaseballSavVideoScraper:
     """
     Class that scrapes Video Data off Baseball Savant. Inherits from the `Crawler` class to perform request with retry 
     and rate limiting.
     """
-    def __init__(self, start_dt: str, end_dt: str = None, 
-                 player: int = None, team_abbr: str = None, pitch_type: str = None,
+    def __init__(self, play_ids_df: pl.DataFrame,
                  download_folder: str = 'savant_videos', 
-                 max_return_videos: int = 10, 
-                 max_videos_per_game: int = None) -> None:
+                 play_id: str = None,
+                 game_pk: int = None) -> None:
 
         self.logger = BaseballCVLogger().get_logger(self.__class__.__name__)
-        super().__init__(start_dt, end_dt, self.logger)
-
-        if (self.end_dt_date - self.start_dt_date).days >= 45:
-            _OVERSIZE_WARN_STRING = """
-            Woah, that's a hefty request you've got there. Please consider using arguments such as 
-            `team_abbr` or `player` if you are only looking for a specific team or player to make
-            queries faster. """
-
-            self.logger.warning(_OVERSIZE_WARN_STRING)
-
-        self.play_ids_df = GamePlayIDScraper(start_dt, end_dt, team_abbr,
-                                          player, pitch_type=pitch_type, 
-                                          max_return_videos=max_return_videos, 
-                                          max_videos_per_game=max_videos_per_game,
-                                          logger=self.logger).run_executor()
         
+        self.play_ids_df = play_ids_df
         self.play_ids = pl.Series(self.play_ids_df.select("play_id")).to_list()
         self.game_pks = pl.Series(self.play_ids_df.select("game_pk")).to_list()
         self.SAVANT_VIDEO_URL = 'https://baseballsavant.mlb.com/sporty-videos?playId={}'
         self.download_folder = download_folder
-        self.max_return_videos = max_return_videos
-        self.max_videos_per_game = max_videos_per_game
         os.makedirs(self.download_folder, exist_ok=True)
+
+    @classmethod
+    def from_date_range(cls, start_dt: str, end_dt: str = None, 
+                 player: int = None, team_abbr: str = None, pitch_type: str = None,
+                 download_folder: str = 'savant_videos', 
+                 max_return_videos: int = 10, 
+                 max_videos_per_game: int = None):
+        
+        play_ids_df = GamePlayIDScraper(start_dt, end_dt, team_abbr,
+                                          player, pitch_type=pitch_type, 
+                                          max_return_videos=max_return_videos, 
+                                          max_videos_per_game=max_videos_per_game).run_executor()
+        
+        return cls(play_ids_df=play_ids_df, download_folder=download_folder)
+    
+    @classmethod
+    def from_play_id(cls, play_ids: Union[str, List[str]], 
+                     game_pks: Union[int, List[int]], 
+                     download_folder: str = 'savant_videos'):
+        pass
+        
 
     def run_executor(self) -> None:
         with concurrent.futures.ThreadPoolExecutor() as executor:
