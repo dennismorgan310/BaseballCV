@@ -1,52 +1,51 @@
-from baseballcv.functions.utils.savant_utils import GamePlayIDScraper
+import os
+import shutil
 import concurrent.futures
 import requests
 from bs4 import BeautifulSoup
-import os
-import shutil
 import polars as pl
-import pandas as pd
-from typing import Union, List
+from typing import Dict, List
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
+from baseballcv.functions.utils import rate_limiter, requests_with_retry, get_pbp_data
 
 class BaseballSavVideoScraper:
     """
     Class that scrapes Video Data off Baseball Savant. Inherits from the `Crawler` class to perform request with retry 
     and rate limiting.
     """
+
+    SAVANT_VIDEO_URL = 'https://baseballsavant.mlb.com/sporty-videos?playId={}'
+
     def __init__(self, play_ids_df: pl.DataFrame,
-                 download_folder: str = 'savant_videos', 
-                 play_id: str = None,
-                 game_pk: int = None) -> None:
+                 download_folder: str = 'savant_videos') -> None:
 
         self.logger = BaseballCVLogger().get_logger(self.__class__.__name__)
         
-        self.play_ids_df = play_ids_df
-        self.play_ids = pl.Series(self.play_ids_df.select("play_id")).to_list()
-        self.game_pks = pl.Series(self.play_ids_df.select("game_pk")).to_list()
-        self.SAVANT_VIDEO_URL = 'https://baseballsavant.mlb.com/sporty-videos?playId={}'
+        self.play_ids_df = play_ids_df.to_pandas() # Can use this for further queries
         self.download_folder = download_folder
         os.makedirs(self.download_folder, exist_ok=True)
 
     @classmethod
     def from_date_range(cls, start_dt: str, end_dt: str = None, 
-                 player: int = None, team_abbr: str = None, pitch_type: str = None,
+                 team_abbr: str = None, player: int = None, pitch_type: str = None,
                  download_folder: str = 'savant_videos', 
                  max_return_videos: int = 10, 
                  max_videos_per_game: int = None):
         
-        play_ids_df = GamePlayIDScraper(start_dt, end_dt, team_abbr,
-                                          player, pitch_type=pitch_type, 
-                                          max_return_videos=max_return_videos, 
-                                          max_videos_per_game=max_videos_per_game).run_executor()
+        play_ids_df = get_pbp_data(start_dt, end_dt, team_abbr, player, pitch_type, max_return_videos, max_videos_per_game)
         
         return cls(play_ids_df=play_ids_df, download_folder=download_folder)
     
     @classmethod
-    def from_play_id(cls, play_ids: Union[str, List[str]], 
-                     game_pks: Union[int, List[int]], 
-                     download_folder: str = 'savant_videos'):
-        pass
+    def from_game_pk(cls, game_pks: List[Dict[int, Dict[str, str]]], 
+                     player: int = None, pitch_type: str = None,
+                     download_folder: str = 'savant_videos', *, 
+                     max_return_videos: int = 10, 
+                     max_videos_per_game: int = None):
+        
+        play_ids_df = get_pbp_data(game_pks, player, pitch_type, max_return_videos, max_videos_per_game)
+
+        return cls(play_ids_df=play_ids_df, download_folder=download_folder)
         
 
     def run_executor(self) -> None:
@@ -54,17 +53,8 @@ class BaseballSavVideoScraper:
             pairs = zip(self.game_pks, self.play_ids) # Ensures these are the same order
             for _ in ProgressBar(executor.map(lambda x: self._download_video(*x), pairs), desc="Downloading Videos", total=len(self.play_ids)):
                 pass
-    
-    def get_play_ids_df(self) -> pd.DataFrame:
-        """
-        Function that returns a queried `DataFrame`. 
 
-        Returns:
-            DataFrame: The play ids df query. Output is similar to statcast csv ouptut.
-        """
-        return self.play_ids_df.to_pandas()
-
-
+    @rate_limiter
     def _download_video(self, game_pk: int, play_id: str) -> None:
         """
         Function that downloads each video query and writes it to the `download_folder`
@@ -77,8 +67,7 @@ class BaseballSavVideoScraper:
         Returns:
             None
         """
-        self.rate_limiter()
-        video_response = self.requests_with_retry(self.SAVANT_VIDEO_URL.format(play_id))
+        video_response = requests_with_retry(self.SAVANT_VIDEO_URL.format(play_id))
 
         if video_response is None:
             self.logger.info('Could not download video %s', play_id)
@@ -91,7 +80,7 @@ class BaseballSavVideoScraper:
             video_url = video_container.find('video').find('source', type='video/mp4')['src']
 
             if video_url:
-                video_container_response = self.requests_with_retry(video_url, stream=True)
+                video_container_response = requests_with_retry(video_url, stream=True)
                 self._write_content(game_pk, play_id, video_container_response)
                 self.logger.info('Successfully downloaded video %s', play_id)
     
