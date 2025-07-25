@@ -8,10 +8,13 @@ from typing import Dict, List
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
 from baseballcv.functions.utils import rate_limiter, requests_with_retry, get_pbp_data
 
+# Use a third of the CPU threads
+cpu_threads = os.cpu_count() / 3 if os.cpu_count() else None
+
 class BaseballSavVideoScraper:
     """
-    Class that scrapes Video Data off Baseball Savant. Inherits from the `Crawler` class to perform request with retry 
-    and rate limiting.
+    Class that scrapes Video Data off Baseball Savant. It also provides pandas DataFrames of the pitch-level data,
+    similar to `pybaseball` statcast function.
     """
 
     SAVANT_VIDEO_URL = 'https://baseballsavant.mlb.com/sporty-videos?playId={}'
@@ -30,29 +33,69 @@ class BaseballSavVideoScraper:
                  team_abbr: str = None, player: int = None, pitch_type: str = None,
                  download_folder: str = 'savant_videos', 
                  max_return_videos: int = 10, 
-                 max_videos_per_game: int = None):
+                 max_videos_per_game: int = None) -> "BaseballSavVideoScraper":
+        """
+        Extracts PBP data via a specified date range.
+
+        Args:
+            start_dt (str): The start date of the query.
+            end_dt (str, optional): The end date of the query. Defaults to None.
+            team_abbr (str, optional): A team abbreviation (i.e. CLE) if filtering for a team. Defaults to None.
+            player (int, optional): A player ID (i.e. 12345) if filtering for a player. Defaults to None.
+            pitch_type (str, optional): A specified pitch type (i.e. FF) if filtering for a particular pitch. Defaults to None.
+            download_folder (str, optional): The folder to save the videos. Defaults to 'savant_videos'.
+            max_return_videos (int, optional): The max videos to be returned. Defaults to 10.
+            max_videos_per_game (int, optional): The max videos to be extracted per game. Defaults to None.
+
+        Returns:
+            BaseballSavVideoScraper: An instantiation of the `BaseballSavVideoScraper` class with inputs 
+            download_folder and play_ids_df
+        """
         
-        play_ids_df = get_pbp_data(start_dt, end_dt, team_abbr, player, pitch_type, max_return_videos, max_videos_per_game)
+        play_ids_df = get_pbp_data(start_dt, end_dt, team_abbr=team_abbr, 
+                                   player= player, pitch_type=pitch_type,
+                                   max_return_videos=max_return_videos, 
+                                   max_videos_per_game=max_videos_per_game)
         
         return cls(play_ids_df=play_ids_df, download_folder=download_folder)
     
     @classmethod
-    def from_game_pk(cls, game_pks: List[Dict[int, Dict[str, str]]], 
+    def from_game_pks(cls, game_pks: List[Dict[int, Dict[str, str]]], 
                      player: int = None, pitch_type: str = None,
-                     download_folder: str = 'savant_videos', *, 
+                     download_folder: str = 'savant_videos',
                      max_return_videos: int = 10, 
-                     max_videos_per_game: int = None):
+                     max_videos_per_game: int = None) -> "BaseballSavVideoScraper":
+        """
+        Extracts PBP data via a specified game selection.
+
+        Args:
+            game_pks (List[Dict[int, Dict[str, str]]]): The queried games. Should be a list of dictionaries formatted as 
+            `{game_pk: {'home_team': home_team, 'away_team': away_team}}`
+            player (int, optional):  A player ID (i.e. 12345) if filtering for a player. Defaults to None.
+            pitch_type (str, optional): A specified pitch type (i.e. FF) if filtering for a particular pitch. Defaults to None.
+            download_folder (str, optional): The folder to save the videos. Defaults to 'savant_videos'.
+            max_return_videos (int, optional): The max videos to be returned. Defaults to 10.
+            max_videos_per_game (int, optional): The max videos to be extracted per game. Defaults to None.
+
+        Returns:
+            BaseballSavVideoScraper: An instantiation of the `BaseballSavVideoScraper` class with inputs 
+            download_folder and play_ids_df
+        """
         
-        play_ids_df = get_pbp_data(game_pks, player, pitch_type, max_return_videos, max_videos_per_game)
+        play_ids_df = get_pbp_data(game_pks, player=player, pitch_type=pitch_type, 
+                                   max_return_videos=max_return_videos, 
+                                   max_videos_per_game=max_videos_per_game)
 
         return cls(play_ids_df=play_ids_df, download_folder=download_folder)
         
 
     def run_executor(self) -> None:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            pairs = zip(self.game_pks, self.play_ids) # Ensures these are the same order
-            for _ in ProgressBar(executor.map(lambda x: self._download_video(*x), pairs), desc="Downloading Videos", total=len(self.play_ids)):
-                pass
+        """
+        Multi-threaded function that concurrently downloads videos to local directory.
+        """
+        with concurrent.futures.ThreadPoolExecutor(max_workers=cpu_threads) as executor:
+            for _ in ProgressBar(executor.map(self._download_video, self.play_ids_df['game_pk'], self.play_ids_df['play_id']), 
+                                 desc="Downloading Videos", total=len(self.play_ids_df)): ...
 
     @rate_limiter
     def _download_video(self, game_pk: int, play_id: str) -> None:
@@ -63,9 +106,6 @@ class BaseballSavVideoScraper:
         Args:
             game_pk (int): The game id of the game. Used as the video file name.
             play_id (str): The play id of the game. Used to query the url and part of the video file name.
-
-        Returns:
-            None
         """
         video_response = requests_with_retry(self.SAVANT_VIDEO_URL.format(play_id))
 
@@ -92,9 +132,6 @@ class BaseballSavVideoScraper:
             game_pk (int): The game id of the game. Used as the video file name.
             play_id (str): The play id of the game. Used to query the url and part of the video file name.
             response (Response): The successful response connection that was used on the url. 
-
-        Returns:
-            None
         """
         content_file = os.path.join(self.download_folder, f'{game_pk}_{play_id}.mp4')
         with open(content_file, 'wb') as f:
@@ -104,9 +141,6 @@ class BaseballSavVideoScraper:
     def cleanup_savant_videos(self) -> None:
         """
         Function that deletes the `download_folder` directory.
-
-        Returns:
-            None
         """
         if os.path.exists(self.download_folder):
             try:

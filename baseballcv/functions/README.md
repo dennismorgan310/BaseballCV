@@ -41,28 +41,48 @@ Key function(s):
 
 #### `BaseballSavVideoScraper` class
 
-##### `__init__` Args:
-- `start_dt` : A string representing the starting date in query (i.e. '2024-08-10') **<ins>REQUIRED</ins>**
-- `end_dt` : A string representing the ending date in query (i.e. '2024-08-10')
-- `player` : A integer representing the player ID you want to filter for (i.e. 608070 for Jose Ràmirez)
-- `team_abbr` : A string representing the team abbreviation you want to filter for (i.e 'CHC' for Chicago Cubs)
-- `pitch_type` : A string representing the kind of pitch you want to filter for (i.e. 'FF' for 4-Seam Fastballs)
-- `download_folder` : A string representing the name of the output folder you want the videos being saved to
-- `max_return_videos` : A integer representing the maximum videos to return in a query. Defaults to 10.
-- `max_videos_per_game` : A integer representing the maximum videos returned for each game. Defaults to None.
+Key functions:
+- `from_date_range(start_dt: str, end_dt: str = None, 
+  team_abbr: str = None, player: int = None, 
+  pitch_type: str = None,
+  download_folder: str = 'savant_videos', 
+  max_return_videos: int = 10, 
+  max_videos_per_game: int = None)`: Extracts PBP data via a specified date range. It helps instantiate the `BaseballSavVideoScraper` class.
+
+- `from_game_pks(game_pks: List[Dict[int, Dict[str, str]]], 
+  player: int = None, pitch_type: str = None,
+  download_folder: str = 'savant_videos',
+  max_return_videos: int = 10, 
+  max_videos_per_game: int = None)`: Extracts PBP data
+  via a specified game_pk input, which is a list of dictionaries. i.e. {game_pk: {'home_team': home_team, 'away_team': away_team}}. It helps instantiate the `BaseballSavVideoScraper` class.
+
+- `run_executor()`: Runs the multi-threaded script, extracting videos from baseball savant and saving it to your local directory.
+
+- `cleanup_savant_videos()` : Removes the download folder directory.
+  
 
 Example Use Cases:
+1. Adding in an extra filter with the dataframe
 ```python
-BaseballSavVideoScraper('2024-05-10', max_return_videos = None) # Return ALL plays in query
-BaseballSavVideoScraper('2024-10-10', '2024-05-10') # Valid query, our function swaps the dates
-BaseballSavVideoScraper('2024-04-12', player = 60870) # Filters for Jose Ramirez plays
-BaseballSavVideoScraper('2024-04-12', player = 60870, team_abbr = 'CLE') # Specifies team you want with Jose Ramirez plays, makes filtering time faster and queries more reliable
+scraper = BaseballSavVideoScraper.from_date_range('2024-05-12')
+df = scraper.play_ids_df
+df = df[df['release_speed'] >= 100] # Additional filter for 100 mph pitches
+scraper.play_ids_df = df
+scraper.run_executor() # Downloads the videos.
 ```
-
-Key function(s):
-- `run_executor()` : Runs a multi-threading channel that efficiently extracts savant video.
-- `get_play_ids_df() -> pd.DataFrame` : Returns a pandas DataFrame of the extracted play ids and pitch-level metrics associated with the play. Similar to the savant csv loaded in from pybaseball.
-- `cleanup_savant_videos()` : Removes the download folder directory.
+2. Querying a player (Jose Ramirez in this example)
+```python
+scraper = BaseballSavVideoScraper.from_date_range('2024-04-12', player = 60870, team_abbr = 'CLE')
+```
+3. Query all videos
+```python
+scraper = BaseballSavVideoScraper.from_date_range('2024-04-12', max_return_videos = None)
+```
+4. Query your own custom games
+```python
+game = [{777019: {'home_team': 'CLE', 'away_team': 'BAL'}}]
+scraper = BaseballSavVideoScraper.from_game_pks(game)
+```
 
 
 ## Usage
