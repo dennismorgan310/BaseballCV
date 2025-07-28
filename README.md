@@ -4,7 +4,7 @@
 
 [![BaseballCV Core Functionality](https://github.com/dylandru/BaseballCV/actions/workflows/pytest.yml/badge.svg)](https://github.com/dylandru/BaseballCV/actions/workflows/pytest.yml)
 [![Package Build](https://github.com/dylandru/BaseballCV/actions/workflows/build.yml/badge.svg)](https://github.com/dylandru/BaseballCV/actions/workflows/build.yml)
-[![codecov](https://codecov.io/github/dylandru/BaseballCV/graph/badge.svg?token=86UGAREPSB)](https://codecov.io/github/dylandru/BaseballCV)
+[![codecov](https://codecov.io/github/BaseballCV/BaseballCV/graph/badge.svg?token=86UGAREPSB)](https://codecov.io/github/BaseballCV/BaseballCV)
 ![Discord](https://img.shields.io/discord/1295073049087053874?style=flat&logo=discord&label=Join%20Our%20Discord!&color=green&link=https%3A%2F%2Fdiscord.com%2Fchannels%2F1295073049087053874%2F)
 
 ![PyPI Downloads](https://img.shields.io/pypi/dm/baseballcv?logo=pypi&label=Package%20Downloads)
@@ -485,12 +485,12 @@ Our main need is for data annotation. With our new annotation app, you can help 
 
 <div align="center">
 
-[![Functions Coverage](https://img.shields.io/codecov/c/github/dylandru/BaseballCV/main?flag=functions&token=86UGAREPSB&label=Functions)](https://codecov.io/gh/dylandru/BaseballCV)
-[![Datasets Coverage](https://img.shields.io/codecov/c/github/dylandru/BaseballCV/main?flag=datasets&token=86UGAREPSB&label=Datasets)](https://codecov.io/gh/dylandru/BaseballCV)
-[![Models Coverage](https://img.shields.io/codecov/c/github/dylandru/BaseballCV/main?flag=model&token=86UGAREPSB&label=Models)](https://codecov.io/gh/dylandru/BaseballCV)
-[![Utilities Coverage](https://img.shields.io/codecov/c/github/dylandru/BaseballCV/main?flag=model&token=86UGAREPSB&label=Utilities)](https://codecov.io/gh/dylandru/BaseballCV)
+[![Functions Coverage](https://img.shields.io/codecov/c/github/BaseballCV/BaseballCV/main?flag=functions&token=86UGAREPSB&label=Functions)](https://codecov.io/gh/BaseballCV/BaseballCV)
+[![Datasets Coverage](https://img.shields.io/codecov/c/github/BaseballCV/BaseballCV/main?flag=datasets&token=86UGAREPSB&label=Datasets)](https://codecov.io/gh/BaseballCV/BaseballCV)
+[![Models Coverage](https://img.shields.io/codecov/c/github/BaseballCV/BaseballCV/main?flag=model&token=86UGAREPSB&label=Models)](https://codecov.io/gh/BaseballCV/BaseballCV)
+[![Utilities Coverage](https://img.shields.io/codecov/c/github/BaseballCV/BaseballCV/main?flag=model&token=86UGAREPSB&label=Utilities)](https://codecov.io/gh/BaseballCV/BaseballCV)
 
-[![Coverage Overview](https://codecov.io/gh/dylandru/BaseballCV/graphs/sunburst.svg?token=86UGAREPSB)](https://codecov.io/gh/dylandru/BaseballCV)
+[![Coverage Overview](https://codecov.io/gh/BaseballCV/BaseballCV/graphs/sunburst.svg?token=86UGAREPSB)](https://codecov.io/gh/BaseballCV/BaseballCV)
 
 </div>
 
