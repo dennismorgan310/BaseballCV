@@ -1,26 +1,13 @@
 import pytest
 import os
+import json
 import requests
-import polars as pl
 import pandas as pd
-from unittest.mock import patch, Mock
+import polars as pl
+from unittest.mock import patch, MagicMock, Mock
 from baseballcv.functions import BaseballSavVideoScraper
-from baseballcv.functions.utils.savant_utils.crawler import Crawler
-from baseballcv.functions.utils.savant_utils.gameday import GamePlayIDScraper
-
-class MonkeyPatchCrawler(Crawler):
-    """
-    Monkey Patch Class that inherits from `Crawler`. This class is necessary as it's implementing the 
-    run executor, which is abstract or else tests on it will throw an error.
-    """
-    def __init__(self, start_dt, end_dt = None):
-            super().__init__(start_dt, end_dt)
-    def run_executor(self):
-        return super().run_executor()
-        
-@pytest.fixture
-def test_crawler():
-    return MonkeyPatchCrawler('2024-02-01')
+from baseballcv.functions.utils import requests_with_retry
+from baseballcv.functions.utils.savant_utils.gameday import _get_team
 
 class TestSavantScraper:
     """
@@ -28,119 +15,113 @@ class TestSavantScraper:
 
     This suite tests for the various capabilities for the scraper, making sure 
     proper video files are written and dataframes are returned. It also tests for
-    some background tasks that assure that the rate limit prevention methods for the
-    API calls are working as expected.
+    appropriate filtering for teams/players as well as API calls.
     """
-    @pytest.fixture(scope='class')
-    def setup(self, tmp_path_factory) -> dict:
-        temp_dir = tmp_path_factory.mktemp('savant_scraper')
-        return {'temp_dir': str(temp_dir)}
-
-    @patch("baseballcv.functions.utils.savant_utils.gameday.GamePlayIDScraper.run_executor")
-    @patch("baseballcv.functions.utils.savant_utils.gameday.GamePlayIDScraper.__init__", return_value=None)
-    def test_init(self, mock_init, mock_run_executor, setup):
-        """
-        Tests the `BaseballSavVideoScraper`implementation.
-
-        Args:
-            setup: Fixture that returns a tempfile directory for where the videos will go.
-
-        The following are tested for in this test case:
-        - The start and end dates are swapped
-        - The `BaseballSavVideoScraper` is a subclass of the Crawler class
-        - That a download folder is created as a result.
-        """
-        mock_run_executor.return_value = pl.DataFrame({'play_id': 'eedwfe-saewqw', 'game_pk': '12345'})
-
-        start_dt, end_dt = '2024-05-01', '2024-04-28'
-        scraper = BaseballSavVideoScraper(start_dt, end_dt, download_folder=setup['temp_dir'])
-        
-        assert issubclass(BaseballSavVideoScraper, Crawler), "Savant Scraper is a subclass of Crawler"
-
-        test_start_dt, test_end_dt = scraper.start_dt, scraper.end_dt
-
-        assert end_dt == test_start_dt, "The dates should be swapped"
-        assert start_dt == test_end_dt, "The dates should be swapped"
-        assert os.path.exists(scraper.download_folder), "A Download Folder should be created"
     
-    # Network call that's fine
-    def test_video_names(self, setup):
+    def validate_video_names(self, scraper: BaseballSavVideoScraper) -> None:
         """
-        Tests the naming convention of the `download_folder` videos and the DataFrames returned are
-        extracted properly.
+        Function that helps validate the video names created in the 
+        destination folder.
 
         Args:
-            setup: Fixture that returns a tempfile directory for where the videos will go.
-
-        The following are tested for in this test case:
-        - The DataFrames returned are pandas and not empty.
-        - The number of videos in the output directory are less than the max return videos (in this case 20).
-        - Each file name has the `game_pk` and `play_id` as the name and ends in .mp4.
-        - The `cleanup_savant_videos` function works as expected.
+            scraper (BaseballSavVideoScraper): An instance of the `BaseballSavVideoScraper` class
         """
-        output_dir = setup['temp_dir']
-        scraper = BaseballSavVideoScraper('2024-04-12', max_return_videos=10, max_videos_per_game=2, download_folder=output_dir)
+        df = scraper.play_ids_df
 
-        assert len(scraper.game_pks) == len(scraper.play_ids), "Game PKs and Play Ids should be the same length"
-        assert os.path.exists(scraper.download_folder), "A Download Folder should be created"
+        random_row = df.sample(1).iloc[0]
+        game_pk, play_id = str(random_row['game_pk']), str(random_row['play_id'])
 
-        scraper.run_executor()
-        df = scraper.get_play_ids_df()
+        videos = os.listdir(scraper.download_folder)
 
-        game_pk, play_id = str(df['game_pk'].iloc[0]), str(df['play_id'].iloc[0])
-
-        assert not df.empty, "There should be a returned DataFrame"
-        assert isinstance(df, pd.DataFrame), "This better be a pandas DataFrame"
-
-        download_folder = scraper.download_folder
-        output_dir = os.listdir(download_folder)
-        assert len(output_dir) <= 10, "There should be at most 10 returned videos"
+        assert len(videos) > 0, 'There should be videos for this test'
 
         # Because threadpool is random with the executions, I have to manually search for the game pk, yikes
         found = False
-        for file in output_dir:
-            assert file.endswith('.mp4'), "File should be in .mp4 format"
-            assert "_" in file, "There should be a _ seperator for game pk and play id"
+        for video in videos:
+            assert video.endswith('.mp4'), f'Video {video} should be .mp4 format'
+            assert "_" in video, f"There should be a _ seperator for game pk and play id in video {video}"
 
-            test_game_pk, test_play_id = file.split('_')[0], file.split('_')[1].split('.')[0]
+            base_name = video.rsplit('.', 1)[0]
+            test_game_pk, test_play_id = base_name.split('_', 1)
             if game_pk == test_game_pk and play_id == test_play_id:
                 found = True
+                break
 
         assert found, "Wrong Naming Convention. There are no instances where the Game Pk and Play ID are in the directory."
 
-        scraper.cleanup_savant_videos()
-        assert not os.path.exists(scraper.download_folder)
-            
-    def test_rate_limiter(self, test_crawler):
+    # Network test
+    def test_date_range(self, tmp_path_factory):
         """
-        Tests the `rate_limiter` function.
+        Tests the `from_date_range` class alternate constructor.
 
         Args:
-            test_crawler: Fixture of the instantiated `TestCrawler` class. Needs to be instantiated to access
-            the desired varialbles to test.
+            tmp_path_factory: Fixture for a temp directory to load videos
 
-        The following are tested for in this test case:
-        - The function is being called.
-        - The expected wait time is the same as mocking the time delay for the function.
+        This tests for the following:
+        - A folder was created
+        - A pandas DataFrame is created and not empty
+        - Custom filtering logic works as expected
+        - Validates the naming convention for scraped videos
+        - Removing videos logic works as expected
         """
+        scraper = BaseballSavVideoScraper.from_date_range('2024-05-01', '2024-05-02', 
+                                                          max_return_videos=10, 
+                                                          download_folder=str(tmp_path_factory.mktemp('savant_videos')))
 
-        crawler = test_crawler
-        rate = 10
-        last_called = 0
+        assert os.path.exists(scraper.download_folder), 'A download folder should be created'
+        assert isinstance(scraper.play_ids_df, pd.DataFrame), 'The play IDs should be a pandas DataFrame'
+        assert not scraper.play_ids_df.empty, 'The DataFrame shouldn\'t be empty'
 
-        crawler.rate_limiter(rate)
+        df = scraper.play_ids_df
+        first_len = len(df)
 
-        assert last_called < crawler.last_called, "Should be a call on the limiter"
+        df = df[df['release_speed'] >= 85] # Do a test filter
+        second_len = len(df)
 
-        with patch('random.uniform', return_value=0), patch("time.time", return_value = 0.05): # Should be less than the rate of 0.1
-            expected_wait = 0.05 + 0
+        assert first_len > second_len, 'A filter should decrease the size of the DataFrame'
 
-            with patch('time.sleep') as mock_sleep:
-                crawler.last_called = 0
-                crawler.rate_limiter(rate)
-                assert mock_sleep.call_args[0][0] == expected_wait, "Wait time should be the same as expected wait time"
+        scraper.play_ids_df = df
 
-    def test_network_error(self, test_crawler):
+        scraper.run_executor()
+
+        self.validate_video_names(scraper)
+
+        scraper.cleanup_savant_videos()
+
+        assert not os.path.exists(scraper.download_folder), '`cleanup_savant_videos` should remove the folder'
+
+    # Network test
+    def test_game_pks(self, tmp_path_factory):
+        """
+        Tests the `from_game_pks` class alternate constructor.
+
+        Args:
+            tmp_path_factory: Fixture for a temp directory to load videos
+
+        This tests for the following:
+        - A folder was created
+        - A pandas DataFrame is created and not empty
+        - The number of returned videos is the same as the input
+        """
+        dummy_game = [{776990: {'home_team': 'KC', 'away_team': 'CLE'}}]
+
+        scraper = BaseballSavVideoScraper.from_game_pks(dummy_game, 
+                                                        download_folder=str(tmp_path_factory.mktemp('savant_videos')), 
+                                                        max_return_videos=5)
+
+        assert os.path.exists(scraper.download_folder), 'A download folder should be created'
+        assert isinstance(scraper.play_ids_df, pd.DataFrame), 'The play IDs should be a pandas DataFrame'
+        assert not scraper.play_ids_df.empty, 'The DataFrame shouldn\'t be empty'
+
+        scraper.run_executor()
+
+        assert len(os.listdir(scraper.download_folder)) == 5, '5 videos should be written'
+
+        self.validate_video_names(scraper)
+        scraper.cleanup_savant_videos()
+
+
+    def test_network_error(self):
         """
         Tests the `request_with_retry` function.
 
@@ -153,61 +134,36 @@ class TestSavantScraper:
         with patch('requests.get', side_effect=[requests.exceptions.RequestException("Temporary network error"), 
                                                 requests.exceptions.RequestException("Temporary network error"),
                                                 Mock(status_code=200)]) as mock_get:
-            response = test_crawler.requests_with_retry('https://example.com/video_url')
+            response = requests_with_retry('https://example.com/video_url')
             assert response.status_code == 200, "The 3rd request should be successful."
             assert mock_get.call_count == 3, "Mock get should be called 3 times."
 
-
-    # Network call that's fine
-    def test_teams_players_pitch_types(self):
+    # Mini network test
+    def test_team_player_filter(self):
         """
-        Tests for various parameter entry such as the teams, players, and pitch types.
+        Tests the `_get_team` function.
 
-        The idea of this class is to make sure that specifying and not specifying a `team_abbr`
-        returns the same output with the same player. This ensures that propper mapping is going on
-        in the backend to extract the `team_abbr` if on the player id is specified. The returned output
-        is one game that Spencer Strider pitched with a random sample of 10 fastballs.
-
-        The following are tested for in this test case:
-        - The unique `game_pk` is 1 and has the correct value.
-        - The unique `pitcher` is 1 and has the correct value.
-        - The unique `pitch_type` is 1 and has the correct value. 
-        - The unique  `away_team` is 1 and has the correct value. (The Braves for this game were away, which is why
-        only the away team was tested.)
+        This tests the following (assume same season):
+        - The correct team is returned for a given player
+        - A no data exception is thrown for a given player that's not on a given team
+        - ValueError is raised for not recognized team and player
         """
-        # Spencer Strider Game, Braves were away
-        # This test can use the data
-        play_ids_df = GamePlayIDScraper('2024-03-29', team_abbr='ATL', player=675911, pitch_type='FF').run_executor()
-        assert not play_ids_df.is_empty()
-        assert play_ids_df.select(pl.col("game_pk").n_unique()).item() == 1, "Should only be one game returned"
-        assert play_ids_df.select(pl.col("game_pk").unique()).item() == 745604, "This is the game that should be returned."
-        assert play_ids_df.select(pl.col("pitcher").n_unique()).item() == 1, "Should only be one pitcher returned"
-        assert play_ids_df.select(pl.col("pitcher").unique()).item() == 675911, "Should return Spencer Strider ID"
-        assert play_ids_df.select(pl.col("pitch_type").n_unique()).item() == 1, "Should only be one pitch type returned"
-        assert play_ids_df.select(pl.col("pitch_type").unique()).item() == 'FF', "Pitch Type should be fastball (FF)"
-        assert play_ids_df.select(pl.col("away_team").n_unique()).item() == 1, "Should only be one team returned"
-        assert play_ids_df.select(pl.col("away_team").unique()).item() == 'ATL', "Should return the Braves"
+        with open('tests/data/test_functions/savant_json_ex/success_game.json', 'r') as f:
+            mock_json_data = json.load(f)
 
-    @pytest.mark.parametrize("params, error", [
-                              ({'team_abbr': 'YO'}, ValueError),
-                              ({'player': 12345}, ValueError),
-                              ({'player': 608070, 'team_abbr': 'YO'}, ValueError)
-                              ])
-    @patch("baseballcv.functions.utils.savant_utils.gameday.GamePlayIDScraper.run_executor", return_value=None)
-    @patch("baseballcv.functions.utils.savant_utils.gameday.GamePKScraper.run_executor", return_value=None)
-    def test_scraper_exceptions(self, mock_game_pk_executor, mock_play_id_executor, params, error, setup):
-        """
-        Tests various exceptions that occur if the input is invalid.
+        assert _get_team(team=None, player=608070, season=2025) == 'CLE', 'The team returned for given player should be Cleveland'
 
-        Args:
-            params: A dictionary of the param-value mapping for the input.
-            error: The exception that is expected from each input param.
-            setup: Fixture that returns a tempfile directory for where the videos will go.
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_json_data
 
-        The following are tested for in this test case:
-        - A invalid `team_abbr` raises a ValueError.
-        - A invalid `player` raises a ValueError.
-        - A valid `player` and invalid `team_abbr` raises a ValueError.
-        """
-        with pytest.raises(error):
-            BaseballSavVideoScraper('2024-05-03', download_folder=setup['temp_dir'], **params)
+        with patch('requests.get', return_value=mock_response), \
+            patch('baseballcv.functions.utils.savant_utils.gameday.thread_game_dates', return_value=[{12345: {'home_team': '', 'away_team': ''}}]):
+            
+            with pytest.raises(pl.exceptions.NoDataError):
+                # Should raise since Lane Thomas didn't play for the Guardians until after the trade deadline
+                BaseballSavVideoScraper.from_date_range('2024-04-08', '2024-04-10', team_abbr='CLE', player=657041, pitch_type='FF')
+
+        with pytest.raises(ValueError):
+            _get_team(team='MAN', player=None, season=2025)
+            _get_team(player=12345, team=None, season=2025)

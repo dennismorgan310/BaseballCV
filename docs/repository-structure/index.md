@@ -30,8 +30,11 @@ BaseballCV/
 │   │   ├── formats/
 │   │   │   ├── datasets_coco_detection.py
 │   │   │   └── datasets_jsonl_detection.py
-│   │   └── processing/
-│   │       └── datasets_processor.py
+│   │   ├── processing/
+│   │   │   ├── datasets_processor.py
+│   │   ├── translation/
+│   │   │   ├── dataset_translator.py
+│   │   │   └── formats.py
 │   ├── functions/
 │   │   ├── dataset_tools.py
 │   │   ├── load_tools.py

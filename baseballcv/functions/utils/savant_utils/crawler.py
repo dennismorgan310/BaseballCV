@@ -49,69 +49,69 @@ def sanitize_date_range(start_dt: str, end_dt: str) -> Tuple[date, date]:
     return start_dt_date, end_dt_date
 
 def generate_date_range(start_dt: date, stop: date, step: int = 1) -> Generator[Tuple[date, date], Any, None]:
-        """
-        Function that iterates over the start and end date ranges using tuples with the ranges from the step. 
-        Ex) 2024-02-01, 2024-02-28, with a step of 3, it will skip every 3 days such as (2024-02-01, 2024-02-03)
+    """
+    Function that iterates over the start and end date ranges using tuples with the ranges from the step. 
+    Ex) 2024-02-01, 2024-02-28, with a step of 3, it will skip every 3 days such as (2024-02-01, 2024-02-03)
 
-        Args:
-            start_dt (date): The starting date, represented as a datetime object.
-            end_dt (date): The ending date, represented as a datetime object.
-            step (int): The number of days to increment by, defaults to 1 day.
+    Args:
+        start_dt (date): The starting date, represented as a datetime object.
+        end_dt (date): The ending date, represented as a datetime object.
+        step (int): The number of days to increment by, defaults to 1 day.
 
-        Returns:
-            Generator[Tuple[datetime, Any], None, None]
-        """
-        low = start_dt
+    Returns:
+        Generator[Tuple[datetime, Any], None, None]
+    """
+    low = start_dt
 
-        while low <= stop:
-            date_span = low.replace(month=3, day=15), low.replace(month=11, day=15)
-            season_start, season_end = VALID_SEASON_DATES.get(low.year, date_span)
-            
-            if low < season_start:
-                low = season_start
+    while low <= stop:
+        date_span = low.replace(month=3, day=15), low.replace(month=11, day=15)
+        season_start, season_end = VALID_SEASON_DATES.get(low.year, date_span)
+        
+        if low < season_start:
+            low = season_start
 
-            elif low > season_end:
-                low, _ = VALID_SEASON_DATES.get(low.year + 1, (date(month=3, day=15, year=low.year + 1), None))
-            
-            if low > stop:
-                return
+        elif low > season_end:
+            low, _ = VALID_SEASON_DATES.get(low.year + 1, (date(month=3, day=15, year=low.year + 1), None))
+        
+        if low > stop:
+            return
 
-            high = min(low + timedelta(step-1), stop)
+        high = min(low + timedelta(step-1), stop)
 
-            yield low, high
+        yield low, high
 
-            low +=timedelta(days=step)
+        low +=timedelta(days=step)
 
 def requests_with_retry(url: str, stream: bool = False) -> (requests.Response | None):
-        """
-        Function that retries a request on a url if it fails. It re-attempts up to 5
-        times with a 10 second timeout if it takes a while to load the page. If the request is
-        re-atempted, it waits for 5 seconds before making another request.
+    """
+    Function that retries a request on a url if it fails. It re-attempts up to 5
+    times with a 10 second timeout if it takes a while to load the page. If the request is
+    re-atempted, it waits for 5 seconds before making another request.
 
-        Args:
-            url (str): The url to make the request on.
-            stream (bool): If it's a video stream, it's set to True. Default to False.
+    Args:
+        url (str): The url to make the request on.
+        stream (bool): If it's a video stream, it's set to True. Default to False.
 
-        Returns:
-            Response: A response to the request if successful, else None.
+    Returns:
+        Response: A response to the request if successful, else None.
 
-        Raises:
-            Exception: Any error that could cause an issue with making the request. Main
-            targeted error is rate limits.
+    Raises:
+        Exception: Any error that could cause an issue with making the request. Main
+        targeted error is rate limits.
 
-        """
-        attempts = 0
-        retries = 5
+    """
+    attempts = 0
+    retries = 5
 
-        while attempts < retries:
-            try:
-                response = requests.get(url, stream=stream, timeout=10)
-                if response.status_code == 200:
-                    return response
-            except Exception as e:
-                logger.warning(f"Error Downloading URL {url}.\nAttempting another: {e}\n")
-                attempts += 1
-                time.sleep(5)
+    while attempts < retries:
+        try:
+            response = requests.get(url, stream=stream, timeout=10)
+            if response.status_code == 200:
+                return response
+        except Exception as e:
+            logger.warning(f"Error Downloading URL {url}.\nAttempting another: {e}\n")
+            attempts += 1
+            time.sleep(5)
 
 def rate_limiter(arg: Union[F, int]) -> Union[F, Callable[[F], F]]:
     """

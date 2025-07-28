@@ -53,7 +53,7 @@ columns_of_interest = list(rename_map.values())
 cpu_threads = os.cpu_count() / 3 if os.cpu_count() else None
 
 def _get_team(team: Union[str, None], player: Union[int, None], season: int) -> Union[str, None]:
-    if not team:
+    if not team and not player:
         return # Skip the function as no team was queried
     
     if player and not team: # If player is specified, but not team, query latest team for faster queries
@@ -62,9 +62,9 @@ def _get_team(team: Union[str, None], player: Union[int, None], season: int) -> 
         people = response.json()['people']
         team_id = None
 
-        for player in people:
-            if player.get('id') == player:
-                team_id = player.get('currentTeam')['id']
+        for p in people:
+            if p.get('id') == player:
+                team_id = p.get('currentTeam')['id']
                 break
 
         if not team_id:
@@ -110,6 +110,8 @@ def _parse_game_dates(start_dt: date, end_dt: date, team_abbr: str = None) -> Di
 
     for games in response.json()['dates']:
         for game in games['games']:
+            if not 'F' in game['status']['statusCode']:
+                continue # Only extract finished games
             home_team = game['teams']['home']['team'].get('abbreviation', 'Unknown')
             away_team = game['teams']['away']['team'].get('abbreviation', 'Unknown')
             game_pk = game.get('gamePk', None)
@@ -197,7 +199,6 @@ def _parse_game_data(
 
 def thread_game_dates(start_dt: date, end_dt: date, team_abbr: str) -> list:
     date_range = list(generate_date_range(start_dt, end_dt))
-
     game_pks = []
     with ProgressBar(total=len(date_range), desc='Extracting Game IDs') as progress:
         with concurrent.futures.ThreadPoolExecutor(max_workers=cpu_threads) as executor:
@@ -221,7 +222,10 @@ def thread_game_data(game_pks: dict, player: str, pitch_type: str, max_videos_pe
     play_ids_df = pl.concat(play_ids_df, how = 'diagonal_relaxed') # Hoping diagonal relaxed fixes the Null -> Ints, Floats columns
 
     if play_ids_df.is_empty():
-        raise pl.exceptions.NoDataError("Cannot continue, no dataframe was returned.")
+        raise pl.exceptions.NoDataError(
+            "Cannot continue, no dataframe was returned.\n"
+            "An issue could be the wrong player for the wrong team in span."
+        )
     
     if max_return_videos:
         return play_ids_df.sample(min(max_return_videos, len(play_ids_df)))
@@ -256,13 +260,13 @@ def get_pbp_data(
 ) -> pl.DataFrame:
 
     start_dt = kwargs.get('start_dt', args[0] if args and isinstance(args[0], str) else None)
-    end_dt = kwargs.get('end_dt', args[1] if args and isinstance(args[1], str) else None)
+    end_dt = kwargs.get('end_dt', args[1] if len(args) == 2 else None)
     team_abbr = kwargs.get('team_abbr', None)
     player = kwargs.get('player', None)
     pitch_type = kwargs.get('pitch_type', None)
     max_videos_per_game = kwargs.get('max_videos_per_game', None)
     max_return_videos = kwargs.get('max_return_videos', 10)
-    game_pks = kwargs.get('game_pks', None)
+    game_pks = kwargs.get('game_pks', args[0] if args and isinstance(args[0], list) else None)
 
     if start_dt:
         start_dt_date, end_dt_date = sanitize_date_range(start_dt, end_dt)
