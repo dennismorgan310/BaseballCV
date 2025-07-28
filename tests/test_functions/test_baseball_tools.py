@@ -2,8 +2,10 @@ import pytest
 import os
 import shutil
 import pandas as pd
-from unittest.mock import patch   
+from unittest.mock import patch, MagicMock
 from baseballcv.functions import BaseballTools
+import matplotlib
+matplotlib.use('Agg') # prevents plot from showing up in GUI windows
 
 class TestBaseballTools:
     """
@@ -43,7 +45,7 @@ class TestBaseballTools:
 
     @pytest.mark.parametrize("mode", ["regular", "batch", "scrape", "idk"])
     @patch('baseballcv.functions.utils.baseball_utils.glove_tracker.GloveTracker.track_video')
-    @patch('baseballcv.functions.baseball_tools.BaseballSavVideoScraper')
+    @patch('baseballcv.functions.baseball_tools.BaseballSavVideoScraper.from_date_range')
     def test_glove_tracker(self, mock_scraper, mock_track, mode, tmp_path_factory):
         """
         Tests the track_gloves method of `BaseballTools` in different modes.
@@ -189,14 +191,17 @@ class TestBaseballTools:
             tools = BaseballTools()
             tools_call = BaseballTools.track_gloves.__get__(tools)
 
-            mock_scraper_instance = mock_scraper.return_value
+            mock_scraper_instance = MagicMock()
+            mock_scraper_instance.play_ids_df = pd.DataFrame({
+                'game_pk': [1, 2, 3],
+                'play_id': ['a', 'b', 'c'],
+                'pitch_type': ['FF', 'SL', 'CH'],
+                'zone': [1, 2, 3]
+            })
+            mock_scraper_instance.download_folder = str(scrape_dir)
             mock_scraper_instance.run_executor.return_value = None
-            mock_scraper_instance.get_play_ids_df.return_value = pd.DataFrame({
-                    'game_pk': [1, 2, 3],
-                    'play_id': ['a', 'b', 'c'],
-                    'pitch_type': ['FF', 'SL', 'CH'],
-                    'zone': [1, 2, 3]
-                })
+
+            mock_scraper.return_value = mock_scraper_instance
             
             with patch('baseballcv.functions.baseball_tools.BaseballTools.track_gloves') as mock_recursive_call:
                 mock_recursive_call.return_value = {
@@ -236,7 +241,6 @@ class TestBaseballTools:
                 
                 mock_recursive_call.assert_called_once(), "The `track_gloves` function should only be called once"
                 mock_scraper_instance.run_executor.assert_called_once(), "Mock run executor should be called"
-                mock_scraper_instance.get_play_ids_df.assert_called_once(), "Mock get play ids df should be called"
 
                 if "statcast_data_added" not in results:
                     results["statcast_data_added"] = True
@@ -263,7 +267,9 @@ class TestBaseballTools:
 
             assert isinstance(results, dict), 'Results should still be a dictionary'
             assert results.get('error', None) is not None, 'Should be an error message'
-
+            
+        import matplotlib.pyplot as plt
+        plt.close('all')
         if os.path.exists('glove_tracking_results'):
             shutil.rmtree('glove_tracking_results')
 
