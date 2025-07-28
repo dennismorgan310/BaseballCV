@@ -103,7 +103,7 @@ class DistanceToZone:
         """
         from baseballcv.functions.savant_scraper import BaseballSavVideoScraper
         
-        savant_scraper = BaseballSavVideoScraper(start_date, end_date,
+        savant_scraper = BaseballSavVideoScraper.from_date_range(start_date, end_date,
                                                  player=player,
                                                  team_abbr=team_abbr, pitch_type=pitch_type,
                                                  max_return_videos=max_videos, 
@@ -113,7 +113,7 @@ class DistanceToZone:
 
         savant_scraper.run_executor()
 
-        pitch_data = savant_scraper.get_play_ids_df()
+        pitch_data = savant_scraper.play_ids_df
 
         video_files = [os.path.join(download_folder, f) for f in os.listdir(download_folder) if f.endswith('.mp4')]
         

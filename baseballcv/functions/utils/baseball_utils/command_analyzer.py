@@ -207,6 +207,7 @@ class CommandAnalyzer:
             Path to the downloaded video or None if unsuccessful
         """
         from baseballcv.functions.savant_scraper import BaseballSavVideoScraper
+        from baseballcv.functions.utils.savant_utils.crawler import requests_with_retry
 
         os.makedirs(video_output_dir, exist_ok=True)
         output_path = os.path.join(video_output_dir, f"{game_pk}_{play_id}.mp4")
@@ -226,7 +227,7 @@ class CommandAnalyzer:
                 temp_dl_folder = os.path.join(video_output_dir, "temp_scraper_init_video_dl")
                 
                 try:
-                    self._video_downloader_instance = BaseballSavVideoScraper(
+                    self._video_downloader_instance = BaseballSavVideoScraper.from_date_range(
                         start_dt=dummy_start,
                         download_folder=temp_dl_folder,
                         max_return_videos=1
@@ -268,7 +269,7 @@ class CommandAnalyzer:
             video_url = source_tag['src']
             
             # Get the video content
-            video_response = downloader.requests_with_retry(video_url, stream=True)
+            video_response = requests_with_retry(video_url, stream=True)
             if not video_response:
                 raise ValueError(f"Failed to get video stream for {play_id}")
                 

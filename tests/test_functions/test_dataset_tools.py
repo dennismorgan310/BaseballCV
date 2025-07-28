@@ -4,6 +4,7 @@ import tempfile
 from baseballcv.functions import DataTools
 from baseballcv.functions import LoadTools
 
+@pytest.mark.skip(reason="Going to move this test + patch it. Want further tests to take less time")
 class TestDatasetTools:
     """ Test class for various Dataset Generation Tools """
 

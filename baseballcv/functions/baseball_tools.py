@@ -334,7 +334,7 @@ class BaseballTools:
             download_folder = tempfile.mkdtemp(prefix="savant_videos_")
     
             try:
-                scraper = BaseballSavVideoScraper(
+                scraper = BaseballSavVideoScraper.from_date_range(
                     start_dt=start_date,
                     end_dt=end_date,
                     team_abbr=team_abbr,
@@ -348,7 +348,7 @@ class BaseballTools:
                 self.logger.info(f"Scraping videos from Baseball Savant...")
                 scraper.run_executor()
                 
-                play_ids_df = scraper.get_play_ids_df()
+                play_ids_df = scraper.play_ids_df
                 
                 if len(play_ids_df) == 0:
                     self.logger.error("No videos were downloaded from Baseball Savant")

@@ -1,19 +1,15 @@
-from abc import ABC, abstractmethod
-from datetime import datetime, date, timedelta
+import os
 import time
 import random
 import requests
-from typing import Any, Generator, Tuple
-import logging
+from functools import wraps
+from datetime import datetime, date, timedelta
+from typing import Any, Generator, Tuple, Union, Callable, TypeVar
+from baseballcv.utilities import BaseballCVLogger
 
-class Crawler(ABC):
-    """
-    Abstract Class that is used for web scraping implementation. 
-    """
-    def __init__(self, start_dt: str, end_dt: str = None, logger: logging.Logger = None) -> None:
-        super().__init__()
+logger = BaseballCVLogger.get_logger(os.path.basename(__file__))
 
-        self.VALID_SEASON_DATES = {
+VALID_SEASON_DATES = {
             2015: (date(2015, 4, 5), date(2015, 11, 1)),
             2016: (date(2016, 4, 3), date(2016, 11, 2)),
             2017: (date(2017, 4, 2), date(2017, 11, 1)),
@@ -24,122 +20,151 @@ class Crawler(ABC):
             2022: (date(2022, 4, 7), date(2022, 11, 5)),
             2023: (date(2023, 3, 30), date(2023, 11, 1)),
             2024: (date(2024, 3, 28), date(2024, 10, 30)),
-            2025: (date(2025, 3, 27), date(2025, 4, 23)) # Will fix this as the season progresses.
-            }
-        self.start_dt = start_dt
-        self.end_dt = end_dt
-        self.logger = logger if logger else logging.getLogger(__name__)
+            2025: (date(2025, 3, 27), date(2025, datetime.today().month, datetime.today().day))
+    }
 
-        if self.end_dt is None:
-            self.end_dt = self.start_dt
-        if self.end_dt < self.start_dt: # If the date order is reversed, swap
-            self.end_dt, self.start_dt = self.start_dt, self.end_dt
+F = TypeVar('F', bound=Callable[..., object]) # Function call type
+
+def sanitize_date_range(start_dt: str, end_dt: str) -> Tuple[date, date]:
+    """
+    Sanitizes the date range from str to a date object.
+
+    Args:
+        start_dt (str): The ideal starting date, though handled if it's greater
+        end_dt (str): The ideal ending date, though handled if it's less than
+
+    Returns:
+        Tuple[date, date]: The start and end date objects.
+    """
+    if end_dt is None:
+        end_dt = start_dt
+
+    if end_dt < start_dt:
+        end_dt, start_dt = start_dt, end_dt
+
+    assert start_dt >= '2015-03-01', 'Please make queries in Statcast Era (At least 2015).'
+
+    start_dt_date, end_dt_date = datetime.strptime(start_dt, "%Y-%m-%d").date(), datetime.strptime(end_dt, "%Y-%m-%d").date()
+
+    return start_dt_date, end_dt_date
+
+def generate_date_range(start_dt: date, stop: date, step: int = 1) -> Generator[Tuple[date, date], Any, None]:
+    """
+    Function that iterates over the start and end date ranges using tuples with the ranges from the step. 
+    Ex) 2024-02-01, 2024-02-28, with a step of 3, it will skip every 3 days such as (2024-02-01, 2024-02-03)
+
+    Args:
+        start_dt (date): The starting date, represented as a datetime object.
+        end_dt (date): The ending date, represented as a datetime object.
+        step (int): The number of days to increment by, defaults to 1 day.
+
+    Returns:
+        Generator[Tuple[datetime, Any], None, None]
+    """
+    low = start_dt
+
+    while low <= stop:
+        date_span = low.replace(month=3, day=15), low.replace(month=11, day=15)
+        season_start, season_end = VALID_SEASON_DATES.get(low.year, date_span)
         
-        assert self.start_dt >= '2015-03-01', 'Please make queries in Statcast Era (At least 2015).'
+        if low < season_start:
+            low = season_start
 
-        self.start_dt_date, self.end_dt_date = datetime.strptime(self.start_dt, "%Y-%m-%d").date(), datetime.strptime(self.end_dt, "%Y-%m-%d").date()
-        self.last_called = 0
+        elif low > season_end:
+            low, _ = VALID_SEASON_DATES.get(low.year + 1, (date(month=3, day=15, year=low.year + 1), None))
+        
+        if low > stop:
+            return
 
-    @abstractmethod
-    def run_executor(self) -> Any:
-        """
-        Function that uses threading on functions calls to improve the speed of the program.
+        high = min(low + timedelta(step-1), stop)
 
-        Returns:
-            Any: In this case it can be a List, DataFrame or None.
-        """
-        pass
+        yield low, high
 
-    def rate_limiter(self, rate = 10) -> None: # Random wait calls
-        """
-        Function that approximates wait time calls per minute so the API isn't rate limiting the program.
-        It uses some noise to prevent consistent wait times.
+        low +=timedelta(days=step)
 
-        Args:
-            rate (int): The number of times the function should be called per second. Default is 10.
+def requests_with_retry(url: str, stream: bool = False) -> (requests.Response | None):
+    """
+    Function that retries a request on a url if it fails. It re-attempts up to 5
+    times with a 10 second timeout if it takes a while to load the page. If the request is
+    re-atempted, it waits for 5 seconds before making another request.
 
-        Returns:
-            None
-        """
-        current_time = time.time()
+    Args:
+        url (str): The url to make the request on.
+        stream (bool): If it's a video stream, it's set to True. Default to False.
+
+    Returns:
+        Response: A response to the request if successful, else None.
+
+    Raises:
+        Exception: Any error that could cause an issue with making the request. Main
+        targeted error is rate limits.
+
+    """
+    attempts = 0
+    retries = 5
+
+    while attempts < retries:
+        try:
+            response = requests.get(url, stream=stream, timeout=10)
+            if response.status_code == 200:
+                return response
+        except Exception as e:
+            logger.warning(f"Error Downloading URL {url}.\nAttempting another: {e}\n")
+            attempts += 1
+            time.sleep(5)
+
+def rate_limiter(arg: Union[F, int]) -> Union[F, Callable[[F], F]]:
+    """
+    A tool that pauses a function throughout it's call if it is making calls to
+    the internet. It is treated as 
+    1. A function that takes an integer input, the rate in seconds for which the function should
+    ideally reach per second. rate=10 is ~10 function calls per second.
+    2. A function call itself that uses the default rate, which is 10.
+
+    **The goal of this decorator is to implement random wait calls for each function call.**
+
+    Example Use:
+    ```python
+    @rate_limiter  # ~10 calls per second by default
+    def example(): ...
+
+    @rate_limiter(4) # ~4 calls per second
+    def example(): ...
+    ```
+
+    Args:
+        arg (Union[F, int]): The input for this decorator. It is made optional.
+
+    Returns:
+        Union[F, Callable[[F], F]]: The handled input function
+    """
+    def decorator(func: F, rate: int = 10) -> F:
         time_between_calls = 1 / rate
+        last_called = 0 
 
-        time_elapsed = current_time - self.last_called
+        @wraps(func)
+        def wrap(*args, **kwargs) -> object:
+            nonlocal last_called # tell python that last_called falls within the scope of wrapper
+            current_time = time.time()
+            elapsed = current_time - last_called
 
-        if time_elapsed < time_between_calls:
-            time_to_wait = time_between_calls - time_elapsed
-            noise = random.uniform(-5, 5)
-            time_to_wait += noise
-            time_to_wait = max(time_to_wait, 0)
-            time.sleep(time_to_wait)
+            if elapsed < time_between_calls:
+                wait_time = time_between_calls - elapsed
+                noise = random.uniform(-1, 1)  # small noise in seconds
+                wait_time += noise
+                wait_time = max(wait_time, 0)
+                time.sleep(wait_time)
 
-        self.last_called = time.time()
+            last_called = time.time()
+            return func(*args, **kwargs)
 
-    def requests_with_retry(self, url: str, stream: bool = False) -> (requests.Response | None):
-        """
-        Function that retries a request on a url if it fails. It re-attempts up to 5
-        times with a 10 second timeout if it takes a while to load the page. If the request is
-        re-atempted, it waits for 5 seconds before making another request.
-
-        Args:
-            url (str): The url to make the request on.
-            stream (bool): If it's a video stream, it's set to True. Default to False.
-
-        Returns:
-            Response: A response to the request if successful, else None.
-
-        Raises:
-            Exception: Any error that could cause an issue with making the request. Main
-            targeted error is rate limits.
-
-        """
-        attempts = 0
-        retries = 5
-
-        while attempts < retries:
-            try:
-                response = requests.get(url, stream=stream, timeout=10)
-                if response.status_code == 200:
-                    return response
-            except Exception as e:
-                self.logger.warning(f"Error Downloading URL {url}.\nAttempting another: {e}\n")
-                attempts += 1
-                time.sleep(5)
-
-        
-    def _date_range(self, start_dt: date, stop: date, step: int = 1) -> Generator[Tuple[date, date], Any, None]:
-        """
-        Function that iterates over the start and end date ranges using tuples with the ranges from the step. 
-        Ex) 2024-02-01, 2024-02-28, with a step of 3, it will skip every 3 days such as (2024-02-01, 2024-02-03)
-
-        Args:
-            start_dt (date): The starting date, represented as a datetime object.
-            end_dt (date): The ending date, represented as a datetime object.
-            step (int): The number of days to increment by, defaults to 1 day.
-
-        Returns:
-            Generator[Tuple[datetime, Any], None, None]
-        """
-        low = start_dt
-
-        while low <= stop:
-            date_span = low.replace(month=3, day=15), low.replace(month=11, day=15)
-            season_start, season_end = self.VALID_SEASON_DATES.get(low.year, date_span)
-            
-            if low < season_start:
-                low = season_start
-
-                self.logger.warning("Skipping Offseason Dates")
-
-            elif low > season_end:
-                low, _ = self.VALID_SEASON_DATES.get(low.year + 1, (date(month=3, day=15, year=low.year + 1), None))
-                self.logger.warning("Skipping Offseason Dates")
-            
-            if low > stop:
-                return
-
-            high = min(low + timedelta(step-1), stop)
-
-            yield low, high
-
-            low +=timedelta(days=step)
+        return wrap
+    
+    if callable(arg):
+        # @rate_limiter
+        return decorator(arg)
+    else:
+        # @rate_limiter(5)
+        def wrap(func: F) -> F:
+            return decorator(func, rate=arg)
+        return wrap

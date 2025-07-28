@@ -237,29 +237,48 @@ Class for scraping baseball videos from Baseball Savant based on various criteri
 
 ```python
 BaseballSavVideoScraper(
-    start_dt: str,
-    end_dt: str = None,
-    player: int = None,
-    team_abbr: str = None,
-    pitch_type: str = None,
+    play_ids_df: DataFrame,
     download_folder: str = 'savant_videos',
-    max_return_videos: int = 10,
-    max_videos_per_game: int = None
 )
 ```
 
 | Parameter | Type | Description | Default |
 |:----------|:-----|:------------|:--------|
-| `start_dt` | str | Start date (YYYY-MM-DD) | Required |
-| `end_dt` | str | End date (YYYY-MM-DD) | None |
-| `player` | int | Player ID to filter by | None |
-| `team_abbr` | str | Team abbreviation to filter by | None |
-| `pitch_type` | str | Pitch type to filter by | None |
+| `play_ids_df` | DataFrame | A polars DataFrame of the queried results | **Required** | 
 | `download_folder` | str | Folder for downloaded videos | 'savant_videos' |
-| `max_return_videos` | int | Maximum videos to return | 10 |
-| `max_videos_per_game` | int | Maximum videos per game | None |
 
 #### Methods
+
+##### from_date_range
+<span class="label label-purple">classmethod</span>
+
+Extracts the PBP data from a specified date range.
+
+| Parameter | Type | Description | Default |
+|:----------|:-----|:------------|:--------|
+| `start_dt` | str | The start date of the query | **Required** | 
+| `end_dt` | str | The end date of the query | None |
+| `team_abbr` | str | A team abbreviation (i.e. CLE) if filtering for a team | None |
+| `player` | int | A player ID (i.e. 12345) if filtering for a player | None |
+| `pitch_type` | str | A specified pitch type (i.e. FF) if filtering for a particular pitch | None |
+| `download_folder` | str | Folder for downloaded videos | 'savant_videos' |
+| `max_return_videos` | int | The max videos to be returned | 10 |
+| `max_videos_per_game` | int | The max videos to be extracted per game | None | 
+
+##### from_game_pks
+<span class="label label-purple">classmethod</span>
+
+Extracts the PBP data from a specified game query.
+
+| Parameter | Type | Description | Default |
+|:----------|:-----|:------------|:--------|
+| `game_pks` | list | The queried games | **Required** | 
+| `player` | int | A player ID (i.e. 12345) if filtering for a player | None |
+| `pitch_type` | str | A specified pitch type (i.e. FF) if filtering for a particular pitch | None |
+| `download_folder` | str | Folder for downloaded videos | 'savant_videos' |
+| `max_return_videos` | int | The max videos to be returned | 10 |
+| `max_videos_per_game` | int | The max videos to be extracted per game | None | 
+
 
 ##### run_executor
 
@@ -268,14 +287,6 @@ run_executor() → None
 ```
 
 Run multithreaded video downloading process.
-
-##### get_play_ids_df
-
-```python
-get_play_ids_df() → pd.DataFrame
-```
-
-Returns a pandas DataFrame of the extracted play IDs and associated data.
 
 ##### cleanup_savant_videos
 
