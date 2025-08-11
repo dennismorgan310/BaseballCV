@@ -8,8 +8,7 @@ from typing import Dict, List
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
 from baseballcv.functions.utils import rate_limiter, requests_with_retry, get_pbp_data
 
-# Use a third of the CPU threads
-cpu_threads = os.cpu_count() / 3 if os.cpu_count() else None
+cpu_threads = min(32, os.cpu_count() + 4)
 
 class BaseballSavVideoScraper:
     """
