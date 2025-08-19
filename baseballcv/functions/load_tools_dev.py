@@ -86,6 +86,9 @@ class LoadTools:
         
         self.output_dir = output_dir
 
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
         self.logger = BaseballCVLogger.get_logger(self.__class__.__name__)
 
     async def _download_file(self, session: aiohttp.ClientSession, url: str, headers: dict, dest: str, filename: str, limiter: asyncio.Semaphore) -> None:
@@ -114,7 +117,7 @@ class LoadTools:
 
     def load_from_baseballcv(
             self, 
-            query: str, 
+            query: Literal['list_datasets', 'list_models', 'load_model', 'load_dataset'], 
             alias: Union[str, list, None] = None, 
         ) -> Union[Any, dict]:
         """
@@ -133,7 +136,6 @@ class LoadTools:
             self.endpoints.get(query), 
             self.baseballcv_api.token
         )
-
         response = requests.get(url.format(alias), headers=headers)
         response.raise_for_status()
 
@@ -142,14 +144,14 @@ class LoadTools:
         if not filename:
             return response.json() # It's a link to an endpoint
 
-        filename = self.FILE_REGEX.search(filename)
+        filename = self.FILE_REGEX.search(filename).group(1) # Should just be one file listed for now
 
-        is_success = False
+        # Filename: link
+        extracted_files = {filename: response.url}
+
         # We return ZIP files
-        if response.status_code == 302: # This does not work for some reason with 302 status code
-            is_success = self._download_file(response.url, self.output_dir)
+        run_tasks_in_loop(self._download_files_in_concurrency, extracted_files=extracted_files, headers=headers, dest=self.output_dir)
 
-        return {query: filename, 'success': is_success, 'output_pth': self.output_dir}
     
     def load_from_huggingface(
             self, 
@@ -159,7 +161,7 @@ class LoadTools:
             ignore_patterns: Union[Tuple[str], str] = ('.md', '.gitattributes', '.gitignore'),
             limit: int = None,
             **kwargs
-        ) -> None:
+        ) -> Union[Any, None]:
         """
         Function that loads in data and models from HuggingFace API. This function is best suited
         for BaseballCV datasets and models.
@@ -192,6 +194,9 @@ class LoadTools:
         ```
         Raises:
             ValueError: If the query is for `health`, invalid for HuggingFace.
+        
+        Returns:
+            Union[Any, None]: The listed models or datasets or downloads the queried data
         """
 
         if query == 'health': 
@@ -204,8 +209,12 @@ class LoadTools:
         )
 
         response = requests.get(url.format(repo_id), params=dict(**kwargs), headers=headers)
+        response.raise_for_status()
 
         response_info = response.json()
+
+        if query == 'list_datasets' or query == 'list_models':
+            return response_info
 
         sha = response_info['sha'] # revision hash
 
@@ -220,9 +229,6 @@ class LoadTools:
         hf_url_fmt = (self.hf_api.url + '/datasets' if query == 'load_dataset' else self.hf_api.url) + '/{}/resolve/{}/{}'
 
         extracted_files = {name: hf_url_fmt.format(repo_id, sha, name) for name in files}
-
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
 
         run_tasks_in_loop(self._download_files_in_concurrency, extracted_files=extracted_files, headers=headers, dest=self.output_dir)
 
@@ -250,12 +256,11 @@ class LoadTools:
 
                 for filename, data in zip(table['filename'], table['image']):
                     with open(os.path.join(destination, filename), 'wb') as f:
-                        f.write(data.get('bytes'))
+                        f.write(data.get('bytes') if isinstance(data, dict) else data)
+                
+                os.remove(file_pth)
             except pq.ArrowInvalid:
                 self.logger.error(f'Issue retrieving content from {file}. Most likely does not have data. skipping...')
-            
-            finally:
-                os.remove(file_pth)
 
         if len(os.listdir(self.output_dir)) == 0:
             shutil.rmtree(self.output_dir)
@@ -265,9 +270,10 @@ if __name__ == '__main__':
 
     load_dotenv('.env')
 
-    tools = LoadTools(hf_api_token=os.environ.get("HF_TOKEN"), baseballcv_api_token=os.environ.get("BASEBALLCV_TOKEN"))
+    tools = LoadTools(hf_api_token=os.environ.get("HF_TOKEN"), baseballcv_api_token=os.environ.get("BASEBALLCV_TOKEN"),
+                      output_dir='output')
 
-    # p = tools.load_from_huggingface(repo_id='dyland222/detr-coco-baseball_v2', query='load_model')
-    # p = tools.load_from_huggingface(repo_id='dyland222/international_amateur_baseball_catcher_photos', query='load_dataset')
+    # p = tools.load_from_baseballcv(query='load_model', alias='phc_detector')
 
-    tools.write_from_parquet('cool')
+    # tools.load_from_huggingface(query='load_dataset', repo_id='dyland222/international_amateur_baseball_photos_dataset', limit=1)
+    tools.unzip_from_parquet(destination='downloads_dest')

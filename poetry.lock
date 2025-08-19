@@ -46,6 +46,21 @@ test-trackers = ["comet-ml", "dvclive", "matplotlib", "mlflow", "tensorboard", "
 testing = ["bitsandbytes", "datasets", "diffusers", "evaluate", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "addict"
+version = "2.4.0"
+description = "Addict is a dictionary whose items can be set using both attribute and item syntax."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "addict-2.4.0-py3-none-any.whl", hash = "sha256:249bb56bbfd3cdc2a004ea0ff4c2b6ddc84d53bc2194761636eb314d5cfa5dfc"},
+    {file = "addict-2.4.0.tar.gz", hash = "sha256:b3b2210e0e067a281f5646c8c5db92e99b7231ea8b0eb5f74dbdf9e259d4e494"},
+]
+
+[[package]]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 name = "aiohappyeyeballs"
 version = "2.6.1"
 description = "Happy Eyeballs for asyncio"
@@ -329,6 +344,56 @@ tests = ["cloudpickle ; platform_python_implementation == \"CPython\"", "hypothe
 tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\"", "pytest-mypy-plugins ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\""]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "autodistill"
+version = "0.1.29"
+description = "Distill large foundational models into smaller, domain-specific models for deployment"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "autodistill-0.1.29-py3-none-any.whl", hash = "sha256:6b5ef69a1ea5dba918371f7806fa990f2553ee537411ac67da852f0da6374ea7"},
+    {file = "autodistill-0.1.29.tar.gz", hash = "sha256:ed577fb8d8a510105ac8553feda4e324c6e29210d43b2d2a03ca4813c9c3ac33"},
+]
+
+[package.dependencies]
+click = "*"
+opencv-python = ">=4.6.0"
+Pillow = ">=7.1.2"
+PyYAML = ">=5.3.1"
+supervision = "*"
+tqdm = "*"
+
+[package.extras]
+dev = ["black (==22.3.0)", "flake8", "isort", "mkdocs", "mkdocs-material", "pytest", "twine", "wheel"]
+
+[[package]]
+name = "autodistill-grounded-sam"
+version = "0.1.2"
+description = "Automatically distill large foundational models into smaller, in-domain models for deployment"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "autodistill_grounded_sam-0.1.2-py3-none-any.whl", hash = "sha256:eb0f337581c36e07b1e90e14cf53626a32f067c0d7618681c4f6c68a861fe93b"},
+    {file = "autodistill_grounded_sam-0.1.2.tar.gz", hash = "sha256:0e691f749b9809e030892fc7214eec11d1a06dc56000b2b1687f08e2c542a38b"},
+]
+
+[package.dependencies]
+autodistill = "*"
+numpy = ">=1.20.0"
+opencv-python = ">=4.6.0"
+rf-groundingdino = "*"
+rf-segment-anything = "*"
+supervision = "*"
+torch = "*"
+
+[package.extras]
+dev = ["black (==22.3.0)", "flake8", "isort", "pytest", "twine", "wheel"]
+
+[[package]]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 name = "bbox-visualizer"
 version = "0.2.1"
 description = "Different ways of visualizing objects given bounding box data"
@@ -595,7 +660,11 @@ version = "8.1.8"
 description = "Composable command line interface toolkit"
 optional = false
 python-versions = ">=3.7"
+<<<<<<< HEAD
 groups = ["dev"]
+=======
+groups = ["main", "dev"]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 files = [
     {file = "click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2"},
     {file = "click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a"},
@@ -1723,6 +1792,28 @@ grpcio = ">=1.62.3"
 protobuf = ">=4.21.6"
 
 [[package]]
+name = "hf-xet"
+version = "1.1.7"
+description = "Fast transfer of large files with the Hugging Face Hub."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\" or platform_system == \"Linux\" and platform_machine == \"aarch64\""
+files = [
+    {file = "hf_xet-1.1.7-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:60dae4b44d520819e54e216a2505685248ec0adbdb2dd4848b17aa85a0375cde"},
+    {file = "hf_xet-1.1.7-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:b109f4c11e01c057fc82004c9e51e6cdfe2cb230637644ade40c599739067b2e"},
+    {file = "hf_xet-1.1.7-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6efaaf1a5a9fc3a501d3e71e88a6bfebc69ee3a716d0e713a931c8b8d920038f"},
+    {file = "hf_xet-1.1.7-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:751571540f9c1fbad9afcf222a5fb96daf2384bf821317b8bfb0c59d86078513"},
+    {file = "hf_xet-1.1.7-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:18b61bbae92d56ae731b92087c44efcac216071182c603fc535f8e29ec4b09b8"},
+    {file = "hf_xet-1.1.7-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:713f2bff61b252f8523739969f247aa354ad8e6d869b8281e174e2ea1bb8d604"},
+    {file = "hf_xet-1.1.7-cp37-abi3-win_amd64.whl", hash = "sha256:2e356da7d284479ae0f1dea3cf5a2f74fdf925d6dca84ac4341930d892c7cb34"},
+    {file = "hf_xet-1.1.7.tar.gz", hash = "sha256:20cec8db4561338824a3b5f8c19774055b04a8df7fff0cb1ff2cb1a0c1607b80"},
+]
+
+[package.extras]
+tests = ["pytest"]
+
+[[package]]
 name = "httplib2"
 version = "0.22.0"
 description = "A comprehensive HTTP client library."
@@ -1739,19 +1830,20 @@ pyparsing = {version = ">=2.4.2,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.0.2 || >3.0
 
 [[package]]
 name = "huggingface-hub"
-version = "0.30.2"
+version = "0.34.4"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
 optional = false
 python-versions = ">=3.8.0"
 groups = ["main"]
 files = [
-    {file = "huggingface_hub-0.30.2-py3-none-any.whl", hash = "sha256:68ff05969927058cfa41df4f2155d4bb48f5f54f719dd0390103eefa9b191e28"},
-    {file = "huggingface_hub-0.30.2.tar.gz", hash = "sha256:9a7897c5b6fd9dad3168a794a8998d6378210f5b9688d0dfc180b1a228dc2466"},
+    {file = "huggingface_hub-0.34.4-py3-none-any.whl", hash = "sha256:9b365d781739c93ff90c359844221beef048403f1bc1f1c123c191257c3c890a"},
+    {file = "huggingface_hub-0.34.4.tar.gz", hash = "sha256:a4228daa6fb001be3f4f4bdaf9a0db00e1739235702848df00885c9b5742c85c"},
 ]
 
 [package.dependencies]
 filelock = "*"
 fsspec = ">=2023.5.0"
+hf-xet = {version = ">=1.1.3,<2.0.0", markers = "platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\""}
 packaging = ">=20.9"
 pyyaml = ">=5.1"
 requests = "*"
@@ -1759,17 +1851,19 @@ tqdm = ">=4.42.1"
 typing-extensions = ">=3.7.4.3"
 
 [package.extras]
-all = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "fastapi", "gradio (>=4.0.0)", "jedi", "libcst (==1.4.0)", "mypy (==1.5.1)", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "ruff (>=0.9.0)", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3", "typing-extensions (>=4.8.0)", "urllib3 (<2.0)"]
+all = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "authlib (>=1.3.2)", "fastapi", "gradio (>=4.0.0)", "httpx", "itsdangerous", "jedi", "libcst (>=1.4.0)", "mypy (==1.15.0) ; python_version >= \"3.9\"", "mypy (>=1.14.1,<1.15.0) ; python_version == \"3.8\"", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "ruff (>=0.9.0)", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3", "typing-extensions (>=4.8.0)", "urllib3 (<2.0)"]
 cli = ["InquirerPy (==0.3.4)"]
-dev = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "fastapi", "gradio (>=4.0.0)", "jedi", "libcst (==1.4.0)", "mypy (==1.5.1)", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "ruff (>=0.9.0)", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3", "typing-extensions (>=4.8.0)", "urllib3 (<2.0)"]
+dev = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "authlib (>=1.3.2)", "fastapi", "gradio (>=4.0.0)", "httpx", "itsdangerous", "jedi", "libcst (>=1.4.0)", "mypy (==1.15.0) ; python_version >= \"3.9\"", "mypy (>=1.14.1,<1.15.0) ; python_version == \"3.8\"", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "ruff (>=0.9.0)", "soundfile", "types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3", "typing-extensions (>=4.8.0)", "urllib3 (<2.0)"]
 fastai = ["fastai (>=2.4)", "fastcore (>=1.3.27)", "toml"]
 hf-transfer = ["hf-transfer (>=0.1.4)"]
-hf-xet = ["hf-xet (>=0.1.4)"]
+hf-xet = ["hf-xet (>=1.1.2,<2.0.0)"]
 inference = ["aiohttp"]
-quality = ["libcst (==1.4.0)", "mypy (==1.5.1)", "ruff (>=0.9.0)"]
+mcp = ["aiohttp", "mcp (>=1.8.0)", "typer"]
+oauth = ["authlib (>=1.3.2)", "fastapi", "httpx", "itsdangerous"]
+quality = ["libcst (>=1.4.0)", "mypy (==1.15.0) ; python_version >= \"3.9\"", "mypy (>=1.14.1,<1.15.0) ; python_version == \"3.8\"", "ruff (>=0.9.0)"]
 tensorflow = ["graphviz", "pydot", "tensorflow"]
 tensorflow-testing = ["keras (<3.0)", "tensorflow"]
-testing = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "fastapi", "gradio (>=4.0.0)", "jedi", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "soundfile", "urllib3 (<2.0)"]
+testing = ["InquirerPy (==0.3.4)", "Jinja2", "Pillow", "aiohttp", "authlib (>=1.3.2)", "fastapi", "gradio (>=4.0.0)", "httpx", "itsdangerous", "jedi", "numpy", "pytest (>=8.1.1,<8.2.2)", "pytest-asyncio", "pytest-cov", "pytest-env", "pytest-mock", "pytest-rerunfailures", "pytest-vcr", "pytest-xdist", "soundfile", "urllib3 (<2.0)"]
 torch = ["safetensors[torch]", "torch"]
 typing = ["types-PyYAML", "types-requests", "types-simplejson", "types-toml", "types-tqdm", "types-urllib3", "typing-extensions (>=4.8.0)"]
 
@@ -3880,6 +3974,26 @@ typing = ["typing-extensions ; python_version < \"3.10\""]
 xmp = ["defusedxml"]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "platformdirs"
+version = "4.3.7"
+description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "platformdirs-4.3.7-py3-none-any.whl", hash = "sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94"},
+    {file = "platformdirs-4.3.7.tar.gz", hash = "sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351"},
+]
+
+[package.extras]
+docs = ["furo (>=2024.8.6)", "proselint (>=0.14)", "sphinx (>=8.1.3)", "sphinx-autodoc-typehints (>=3)"]
+test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=8.3.4)", "pytest-cov (>=6)", "pytest-mock (>=3.14)"]
+type = ["mypy (>=1.14.1)"]
+
+[[package]]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 name = "pluggy"
 version = "1.5.0"
 description = "plugin and hook calling mechanisms for python"
@@ -4880,6 +4994,49 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "rf-groundingdino"
+version = "0.2.0"
+description = "open-set object detector"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "rf_groundingdino-0.2.0-py2.py3-none-any.whl", hash = "sha256:a7bd83412538c304ae191a78390bcca11ee3479568d7cafe28acbab9a79f1149"},
+    {file = "rf_groundingdino-0.2.0.tar.gz", hash = "sha256:be08ad94cd25a4959468eca2fabbeb8900c65573e3d05d3b659811c6f33da100"},
+]
+
+[package.dependencies]
+addict = "*"
+numpy = "*"
+opencv-python = "*"
+pycocotools = "*"
+supervision = "*"
+timm = "*"
+torch = "*"
+torchvision = "*"
+transformers = "*"
+yapf = "*"
+
+[[package]]
+name = "rf-segment-anything"
+version = "1.0"
+description = "Segment anything with a few lines of code"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "rf_segment_anything-1.0-py3-none-any.whl", hash = "sha256:8aa3b56bb776f73e3680dd1fd6b905c4e0e8281de71096a26f6d74dd716fad04"},
+    {file = "rf_segment_anything-1.0.tar.gz", hash = "sha256:29aa8ebdf6a821c0583d3fcaa716aa3d2bc75442cd558a88c93f323bf51e067b"},
+]
+
+[package.extras]
+all = ["matplotlib", "onnx", "onnxruntime", "opencv-python", "pycocotools"]
+dev = ["black", "flake8", "isort", "mypy"]
+
+[[package]]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 name = "rf100vl"
 version = "1.0.0"
 description = "RF100-VL Dataset Interface"
@@ -5830,14 +5987,14 @@ files = [
 
 [[package]]
 name = "supervision"
-version = "0.26.0rc7"
+version = "0.26.1"
 description = "A set of easy-to-use utils that will come in handy in any Computer Vision project"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "supervision-0.26.0rc7-py3-none-any.whl", hash = "sha256:f125dc69335ccaa7bfc761d2847d131f00bcefe9238e40303ee4ec0df7259f35"},
-    {file = "supervision-0.26.0rc7.tar.gz", hash = "sha256:428f01ada109c119a1c05dd9c72eec603d0e4b51e5e0285a34d40db68769ff3d"},
+    {file = "supervision-0.26.1-py3-none-any.whl", hash = "sha256:43c55e2830f38f5750be7266208992dc16996da9c9478e067bc2617ebaf91c1a"},
+    {file = "supervision-0.26.1.tar.gz", hash = "sha256:af0db9c5459bb640cf0d31e9a4df3296020b4cd0dd484d8659eafe7b475b68f2"},
 ]
 
 [package.dependencies]
@@ -5852,9 +6009,6 @@ scipy = ">=1.10.0"
 tqdm = ">=4.62.3"
 
 [package.extras]
-build = ["build (>=0.10,<1.3)", "twine (>=5.1.1,<7.0.0)", "wheel (>=0.40,<0.46)"]
-dev = ["docutils (!=0.21)", "ipywidgets (>=8.1.1)", "jupytext (>=1.16.1)", "nbconvert (>=7.14.2)", "notebook (>=6.5.3,<8.0.0)", "pytest (>=7.2.2,<9.0.0)", "tox (>=4.11.4)"]
-docs = ["mike (>=2.0.0)", "mkdocs-git-committers-plugin-2 (>=2.4.1) ; python_version >= \"3.8\" and python_version < \"4\"", "mkdocs-git-revision-date-localized-plugin (>=1.2.4)", "mkdocs-jupyter (>=0.24.3)", "mkdocs-material[imaging] (>=9.5.5)", "mkdocstrings (>=0.25.2,<0.30.0)", "mkdocstrings-python (>=1.10.9)"]
 metrics = ["pandas (>=2.0.0)"]
 
 [[package]]
@@ -6023,7 +6177,11 @@ version = "2.2.1"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
+<<<<<<< HEAD
 groups = ["dev"]
+=======
+groups = ["main", "dev"]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 markers = "python_version < \"3.11\""
 files = [
     {file = "tomli-2.2.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:678e4fa69e4575eb77d103de3df8a895e1591b48e740211bd1067378c69e8249"},
@@ -6696,6 +6854,25 @@ files = [
 ]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "yapf"
+version = "0.43.0"
+description = "A formatter for Python code"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "yapf-0.43.0-py3-none-any.whl", hash = "sha256:224faffbc39c428cb095818cf6ef5511fdab6f7430a10783fdfb292ccf2852ca"},
+    {file = "yapf-0.43.0.tar.gz", hash = "sha256:00d3aa24bfedff9420b2e0d5d9f5ab6d9d4268e72afbf59bb3fa542781d5218e"},
+]
+
+[package.dependencies]
+platformdirs = ">=3.5.1"
+tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
+
+[[package]]
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
 name = "yarl"
 version = "1.20.0"
 description = "Yet another URL library"
@@ -6875,4 +7052,8 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9, !=3.9.7, <4.0"
+<<<<<<< HEAD
 content-hash = "cb72eb26f16c35fb4bca8d4b25e89aaf0667c878243bc26a5ebd791f01d1ed05"
+=======
+content-hash = "cbdc9b62cf3fb3871b6151b6bb0c55dccaa98e9c6dacad5c2c62db65e5d65d8f"
+>>>>>>> 79fcfeb (Final touches for HuggingFace)
