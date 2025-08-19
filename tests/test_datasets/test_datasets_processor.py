@@ -3,11 +3,12 @@ import os
 import json
 import logging
 from typing import Tuple
-from baseballcv.datasets import DataProcessor
+from baseballcv.datasets import DatasetProcessor
 @pytest.mark.skip(reason="Appears outdated with the new Translator class. Class needs to be refined anyways")
 class TestDataProcessor:
+    
     @pytest.fixture(scope='class')
-    def setup_data_processor_and_dataset(self, load_dataset) -> Tuple[DataProcessor, str, dict]:
+    def setup_data_processor_and_dataset(self, load_dataset) -> Tuple[DatasetProcessor, str, dict]:
         """Set up a DataProcessor instance and temporary directories
         
         This fixture initializes a DataProcessor instance with a logger and loads a baseball
@@ -26,7 +27,7 @@ class TestDataProcessor:
         """
         logger = logging.getLogger("test_logger")
         
-        processor = DataProcessor(logger)
+        processor = DatasetProcessor(logger)
         dict_classes = {0: 'batter', 1: 'pitcher'}
 
         processed_dataset_path = load_dataset['yolo']

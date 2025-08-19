@@ -1,9 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore")
 
-from .processing.datasets_processor import DataProcessor
+from .processing.datasets_processor import DatasetProcessor
 from .formats.datasets_coco_detection import CocoDetectionDataset
 from .formats.datasets_jsonl_detection import JSONLDetection
 from .translation.dataset_translator import DatasetTranslator
 
-__all__ = ['DataProcessor', 'CocoDetectionDataset', 'JSONLDetection', 'DatasetTranslator']
+__all__ = ['DatasetProcessor', 'CocoDetectionDataset', 'JSONLDetection', 'DatasetTranslator']

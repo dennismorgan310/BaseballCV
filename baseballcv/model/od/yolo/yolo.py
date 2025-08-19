@@ -1,9 +1,32 @@
 import os
+import sys
+import subprocess
 from typing import Dict, List, Optional, Union
-from baseballcv.functions.utils import check_import 
 from baseballcv.model.utils import ModelFunctionUtils
 from pkg_resources import resource_filename
 from baseballcv.utilities import BaseballCVLogger
+
+def check_import(install_path: str, package_name: str) -> bool:
+    """
+    Checks if a package is installed and attempts to install it if not found.
+
+    Args:
+        install_path (str): The path to the package to check.
+        package_name (str): The name of the package to check.
+
+    Returns:
+        bool: True if the package is installed, False otherwise.
+    """
+    try:
+        __import__(package_name)
+        return True
+    except ImportError:
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", install_path])
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install {package_name}: {str(e)}")
+            raise
 
 class YOLOv9:
     def __init__(self, device: str | int = "cuda", model_path: str = '', cfg_path: str = 'models/detect/yolov9-c.yaml', name: str = 'yolov9-c', custom_weights: bool = False) -> None: 
