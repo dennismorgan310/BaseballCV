@@ -296,100 +296,6 @@ cleanup_savant_videos() → None
 
 Deletes the download folder directory.
 
-### DataTools
-{: .d-inline-block }
-
-Dataset Creation
-{: .label .label-blue }
-
-```python
-from baseballcv.functions import DataTools
-```
-
-Class for generating and processing datasets for computer vision tasks in baseball.
-
-#### Constructor
-
-```python
-DataTools()
-```
-
-#### Methods
-
-##### generate_photo_dataset
-
-```python
-generate_photo_dataset(
-    output_frames_folder: str = "cv_dataset",
-    video_download_folder: str = "raw_videos",
-    max_plays: int = 10,
-    max_num_frames: int = 6000,
-    max_videos_per_game: int = 10,
-    start_date: str = "2024-05-22",
-    end_date: str = "2024-07-25",
-    delete_savant_videos: bool = True,
-    use_savant_scraper: bool = True,
-    input_video_folder: str = None,
-    use_supervision: bool = False,
-    frame_stride: int = 30
-) → str
-```
-
-Extracts random frames from baseball videos to create a photo dataset.
-
-| Parameter | Type | Description | Default |
-|:----------|:-----|:------------|:--------|
-| `output_frames_folder` | str | Folder to save photos | "cv_dataset" |
-| `video_download_folder` | str | Folder for videos | "raw_videos" |
-| `max_plays` | int | Maximum plays to download | 10 |
-| `max_num_frames` | int | Maximum frames to extract | 6000 |
-| `max_videos_per_game` | int | Max videos per game | 10 |
-| `start_date` | str | Start date (YYYY-MM-DD) | "2024-05-22" |
-| `end_date` | str | End date (YYYY-MM-DD) | "2024-07-25" |
-| `delete_savant_videos` | bool | Delete videos after extraction | True |
-| `use_savant_scraper` | bool | Use savant scraper | True |
-| `input_video_folder` | str | Custom video folder | None |
-| `use_supervision` | bool | Use supervision library | False |
-| `frame_stride` | int | Frame skip for supervision | 30 |
-
-**Returns**
-
-str: Path to the folder containing the extracted frames
-
-##### automated_annotation
-
-```python
-automated_annotation(
-    model_alias: str = None,
-    model_type: str = 'detection',
-    image_dir: str = "cv_dataset",
-    output_dir: str = "labeled_dataset",
-    conf: float = 0.80,
-    device: str = 'cpu',
-    mode: str = 'autodistill',
-    ontology: dict = None,
-    extension: str = '.jpg'
-) → str
-```
-
-Automatically annotates images using pre-trained models.
-
-| Parameter | Type | Description | Default |
-|:----------|:-----|:------------|:--------|
-| `model_alias` | str | Alias of model to use | None |
-| `model_type` | str | Type of CV model | 'detection' |
-| `image_dir` | str | Directory with images | "cv_dataset" |
-| `output_dir` | str | Directory for output | "labeled_dataset" |
-| `conf` | float | Confidence threshold | 0.80 |
-| `device` | str | Device to run model on | 'cpu' |
-| `mode` | str | Annotation mode | 'autodistill' |
-| `ontology` | dict | Ontology for autodistill | None |
-| `extension` | str | Image file extension | '.jpg' |
-
-**Returns**
-
-str: Path to the output directory with annotated data
-
 ### LoadTools
 {: .d-inline-block }
 
@@ -1002,14 +908,14 @@ baseballcv.datasets
 
 The datasets module provides classes for processing and working with baseball datasets.
 
-### DataProcessor
+### DatasetProcessor
 {: .d-inline-block }
 
 Dataset Processing
 {: .label .label-yellow }
 
 ```python
-from baseballcv.datasets import DataProcessor
+from baseballcv.datasets import DatasetProcessor
 ```
 
 Class for processing and converting between different dataset formats.
@@ -1017,34 +923,31 @@ Class for processing and converting between different dataset formats.
 #### Constructor
 
 ```python
-DataProcessor(logger=None)
+DatasetProcessor()
 ```
 
 #### Methods
 
-##### prepare_dataset
+##### generate_photo_dataset
 
 ```python
-prepare_dataset(
-    base_path: str,
-    dict_classes: Dict[int, str],
-    train_test_split: Tuple[int, int, int] = (80, 10, 10),
-    dataset_type: str = "yolo"
-) → Tuple[str, str, str, str, str]
+generate_photo_dataset(
+    video_folder: str,
+    output_frames_folder: str = "cv_dataset",
+    max_num_frames: int = 6000,
+    frame_stride: int = 30
+) → None:
 ```
 
 Prepare dataset for use with models.
 
 | Parameter | Type | Description | Default |
 |:----------|:-----|:------------|:--------|
-| `base_path` | str | Path to dataset | Required |
-| `dict_classes` | Dict[int, str] | Class ID to name mapping | Required |
-| `train_test_split` | Tuple[int, int, int] | Training/Test/Validation split | (80, 10, 10) |
-| `dataset_type` | str | Dataset type ("yolo", "coco", etc.) | "yolo" |
+| `video_folder` | str | Path to the videos folder | Required |
+| `output_frames_folder` | str | The output directory for the extracted frames | "cv_dataset" |
+| `max_num_frames` | int | The max number of frames to extract | 6000 |
+| `frame_stride` | int | The number of frames to move after a particular frame | 30 |
 
-**Returns**
-
-Tuple[str, str, str, str, str]: Paths to train images, valid images, train annotations, test annotations, valid annotations
 
 ## Utilities Module
 {: .d-inline-block }

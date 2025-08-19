@@ -14,7 +14,8 @@ This guide walks through creating a complete training pipeline for baseball obje
 First, let's set up a comprehensive training pipeline that handles data preparation, model training, and evaluation:
 
 ```python
-from baseballcv.functions import LoadTools, DataTools
+from baseballcv.functions import LoadTools
+from baseballcv.datasets import DatasetProcessor
 from baseballcv.model import DETR
 import torch
 import os
@@ -23,7 +24,7 @@ class BaseballTrainingPipeline:
     def __init__(self, base_data_dir: str):
         """Initialize training pipeline"""
         self.load_tools = LoadTools()
-        self.data_tools = DataTools()
+        self.data_processor = DatasetProcessor()
         self.base_data_dir = base_data_dir
         
         # Define classes for baseball detection
@@ -46,7 +47,7 @@ class BaseballTrainingPipeline:
         Prepare training dataset using BaseballCV's utilities
         """
         # Generate dataset from baseball footage
-        self.data_tools.generate_photo_dataset(
+        self.data_processor.generate_photo_dataset(
             output_frames_folder="raw_dataset",
             max_plays=1000,  # Adjust based on needs
             max_num_frames=6000,
@@ -55,6 +56,7 @@ class BaseballTrainingPipeline:
         )
         
         # Automatically annotate using existing model
+        # This has been deprecated # TODO: Add in a different example
         self.data_tools.automated_annotation(
             model_alias="ball_tracking",
             image_dir="raw_dataset",

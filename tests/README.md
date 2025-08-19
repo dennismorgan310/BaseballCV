@@ -42,7 +42,6 @@ pytest --cov=baseballcv tests/ --cov-report=xml
 |------|-------------|
 | `test_load_tools.py` | Tests model and dataset loading functionality |
 | `test_baseball_tools.py` | Tests baseball-specific analysis tools |
-| `test_dataset_tools.py` | Tests dataset generation and annotation |
 | `test_savant_scraper.py` | Tests Baseball Savant video scraping |
 | `test_command_analyzer.py` | Tests the Command Analyzer class for BaseballTools |
 | `test_dtoz.py` | Tests the Distance to Zone class for BaseballTools |
