@@ -17,7 +17,7 @@ from peft import PeftModel
 from datetime import datetime
 import supervision as sv
 from baseballcv.model.utils import ModelFunctionUtils, ModelVisualizationTools
-from baseballcv.datasets import DataProcessor
+import supervision as sv
 from baseballcv.utilities import BaseballCVLogger, ProgressBar
 
 """
@@ -63,8 +63,6 @@ class PaliGemma2:
         self.processor = None
         self.peft_model = None
         self._init_model()
-
-        self.DataProcessor = DataProcessor(self.logger)
         
         self.ModelFunctionUtils = ModelFunctionUtils(
             self.model_name, 
@@ -221,8 +219,8 @@ class PaliGemma2:
             raise ValueError(f"Task {task} not supported")
 
     
-    def finetune(self, dataset: str, classes: Dict[int, str],
-                 train_test_split: Tuple[int, int, int] = (80, 10, 10),
+    def finetune(self, imgages_pth: str, annotations_pth: str, yaml_pth: str,
+                 train_ratio: float = 0.8,
                  freeze_vision_encoders: bool = False,
                  epochs: int = 20,
                  lr: float = 4e-6,
@@ -262,25 +260,23 @@ class PaliGemma2:
 
         try:
             if dataset_type == "yolo":
-                train_image_path, valid_image_path, train_jsonl_path, _, valid_jsonl_path = (
-                    self.DataProcessor.prepare_dataset(
-                        base_path=dataset,
-                        dict_classes=classes,
-                        train_test_split=train_test_split,
-                        dataset_type=dataset_type
-                    )
-                )
+                detections: sv.DetectionDataset = sv.DetectionDataset.from_yolo(images_directory_path=imgages_pth, 
+                                                                                annotations_directory_path=annotations_pth, 
+                                                                                data_yaml_path=yaml_pth)
+                train_ds, test_ts = detections.split(split_ratio=train_ratio)
 
             else:
-                train_image_path, valid_image_path, train_jsonl_path, _, valid_jsonl_path = (
-                    self.DataProcessor.prepare_dataset(
-                        base_path=dataset,
-                        dict_classes=classes,
-                        dataset_type=dataset_type
-                    )
-                )
+                # sv.Detections.from_lmm(sv.LMM.PALIGEMMA)
+                # train_image_path, valid_image_path, train_jsonl_path, _, valid_jsonl_path = (
+                #     self.DataProcessor.prepare_dataset(
+                #         base_path=dataset,
+                #         dict_classes=classes,
+                #         dataset_type=dataset_type
+                #     )
+                # )
+                self.logger.info('Skip for now')
 
-            self.logger.info(f"Dataset Preparation Complete - Train Path: {train_image_path}, Valid Path: {valid_image_path}")
+            # self.logger.info(f"Dataset Preparation Complete - Train Path: {train_image_path}, Valid Path: {valid_image_path}")
 
             if self.device == "cuda":
                 torch.backends.cuda.matmul.allow_tf32 = True
@@ -294,13 +290,13 @@ class PaliGemma2:
                 num_workers = 0
                 self.logger.info("Using 0 workers for Data Loading on MPS")
 
-            self.train_loader, self.val_loader = self.ModelFunctionUtils.setup_data_loaders(
-                train_image_path=train_image_path,
-                valid_image_path=valid_image_path,
-                train_jsonl_path=train_jsonl_path,
-                valid_jsonl_path=valid_jsonl_path,
-                num_workers=num_workers
-            )
+            # self.train_loader, self.val_loader = self.ModelFunctionUtils.setup_data_loaders(
+            #     train_image_path=train_image_path,
+            #     valid_image_path=valid_image_path,
+            #     train_jsonl_path=train_jsonl_path,
+            #     valid_jsonl_path=valid_jsonl_path,
+            #     num_workers=num_workers
+            # )
 
             if freeze_vision_encoders:
                 self.model = self.ModelFunctionUtils.freeze_vision_encoders(self.model)
@@ -529,26 +525,26 @@ class PaliGemma2:
 
         if dataset:
             split_dataset = dataset
-        else:
-            if dataset_type == "yolo":
-                _, valid_image_path, _, _, valid_jsonl_path = self.DataProcessor.prepare_dataset(
-                    base_path=base_path,
-                    dict_classes=classes,
-                    train_test_split=(80, 10, 10),
-                    dataset_type=dataset_type
-                )
-            else:
-                _, valid_image_path, _, _, valid_jsonl_path = self.DataProcessor.prepare_dataset(
-                    base_path=base_path,
-                    dict_classes=classes,
-                    dataset_type=dataset_type
-                )
+        # else:
+        #     if dataset_type == "yolo":
+        #         _, valid_image_path, _, _, valid_jsonl_path = self.DataProcessor.prepare_dataset(
+        #             base_path=base_path,
+        #             dict_classes=classes,
+        #             train_test_split=(80, 10, 10),
+        #             dataset_type=dataset_type
+        #         )
+        #     else:
+        #         _, valid_image_path, _, _, valid_jsonl_path = self.DataProcessor.prepare_dataset(
+        #             base_path=base_path,
+        #             dict_classes=classes,
+        #             dataset_type=dataset_type
+        #         )
             
-            split_dataset = self.ModelFunctionUtils.create_detection_dataset(
-                jsonl_file_path=valid_jsonl_path,
-                image_directory_path=valid_image_path,
-                augment=False
-            )
+        #     split_dataset = self.ModelFunctionUtils.create_detection_dataset(
+        #         jsonl_file_path=valid_jsonl_path,
+        #         image_directory_path=valid_image_path,
+        #         augment=False
+        #     )
         
         eval_loader = DataLoader(
             split_dataset,
