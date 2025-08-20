@@ -192,19 +192,16 @@ savant_results = baseball_tools.track_gloves(
 Creating custom datasets for model training is straightforward with BaseballCV:
 
 ```python
-from baseballcv.functions import DataTools
+from baseballcv.datasets import DatasetProcessor
 
 # Initialize DataTools
-data_tools = DataTools()
+data_tools = DatasetProcessor()
 
 # Generate dataset from videos
 dataset_path = data_tools.generate_photo_dataset(
+    video_folder="savant_videos",
     output_frames_folder="custom_dataset",
-    max_plays=100,
     max_num_frames=5000,
-    start_date="2024-05-01",
-    end_date="2024-05-31",
-    delete_savant_videos=True  # Clean up temporary files
 )
 
 # Auto-annotate with YOLO model
@@ -223,6 +220,7 @@ ontology = {
     "the white home plate on a baseball field": "homeplate"
 }
 
+# This is deprecated, TODO: add in integration with autodistill
 data_tools.automated_annotation(
     image_dir=dataset_path,
     output_dir="annotated_natural_language",
@@ -277,7 +275,8 @@ print(f"Model performance: {metrics}")
 BaseballCV's true power emerges when combining its components into comprehensive analysis pipelines:
 
 ```python
-from baseballcv.functions import LoadTools, DataTools, BaseballTools
+from baseballcv.functions import LoadTools, BaseballTools
+from baseballcv.datasets import DatasetProcessor
 from baseballcv.model import Florence2
 import os
 
@@ -286,7 +285,7 @@ class PitchAnalysisPipeline:
     
     def __init__(self, output_dir="analysis_results"):
         self.load_tools = LoadTools()
-        self.data_tools = DataTools()
+        self.data_processor = DatasetProcessor()
         self.baseball_tools = BaseballTools(device="cuda")
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -318,11 +317,9 @@ class PitchAnalysisPipeline:
         )
         
         # Step 3: Extract frames for further analysis
-        frames = self.data_tools.generate_photo_dataset(
+        frames = self.data_processor.generate_photo_dataset(
+            video_folder="savant_videos",
             output_frames_folder=os.path.join(self.output_dir, "frames"),
-            start_date=date,
-            end_date=date,
-            max_plays=max_videos
         )
         
         # Step 4: Run contextual analysis on key frames

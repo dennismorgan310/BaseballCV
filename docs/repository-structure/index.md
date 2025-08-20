@@ -36,7 +36,6 @@ BaseballCV/
 │   │   │   ├── dataset_translator.py
 │   │   │   └── formats.py
 │   ├── functions/
-│   │   ├── dataset_tools.py
 │   │   ├── load_tools.py
 │   │   ├── savant_scraper.py
 │   │   ├── baseball_tools.py
@@ -110,11 +109,6 @@ Core utility functions that power BaseballCV's capabilities:
 - Glove tracking and movement analysis
 - Comprehensive analysis of catcher positioning
 
-**DataTools**
-- Dataset generation from videos
-- Automated annotation with pre-trained models
-- Dataset conversion between formats
-
 **LoadTools**
 - Model loading and management
 - Dataset downloading and preparation
@@ -150,15 +144,14 @@ Dataset handling and processing:
 
 **Processing**
 - Data processing and transformation
-- Format conversion utilities
-- Augmentation strategies
+- Generates frame datasets
 
 ## Component Interaction
 
 BaseballCV's components are designed to work together seamlessly. A typical workflow might involve:
 1. Using `BaseballSavVideoScraper` to obtain game footage
 2. Processing videos with `BaseballTools` for analysis
-3. Generating datasets with `DataTools` for model training
+3. Generating datasets with `DatasetProcessor` for model training
 4. Training models using the appropriate model implementation
 5. Visualizing results with the visualization tools
 

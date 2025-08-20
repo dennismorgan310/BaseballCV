@@ -22,7 +22,8 @@ A baseball analysis pipeline typically involves several key steps working in har
 Let's build a complete pipeline that demonstrates these concepts:
 
 ```python
-from baseballcv.functions import LoadTools, DataTools
+from baseballcv.functions import LoadTools
+from baseballcv.datasets import DatasetProcessor
 from baseballcv.models import Florence2
 import cv2
 import numpy as np
@@ -35,7 +36,7 @@ class BaseballAnalysisPipeline:
     def __init__(self):
         # Initialize our core tools
         self.load_tools = LoadTools()
-        self.data_tools = DataTools()
+        self.data_processor = DatasetProcessor()
         
         # Load our specialized models
         self.ball_model = self.load_model_with_retry("ball_tracking")
@@ -64,7 +65,7 @@ class BaseballAnalysisPipeline:
         """
         # Extract frames from the video
         self.logger.info("Extracting frames from video sequence")
-        frames = self.data_tools.generate_photo_dataset(
+        frames = self.data_processor.generate_photo_dataset(
             video_path,
             max_num_frames=90,  # Capture full pitch sequence
             output_frames_folder="analysis_frames"
