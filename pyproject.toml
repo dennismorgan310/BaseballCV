@@ -31,17 +31,15 @@ requests = "^2.32.4"
 beautifulsoup4 = "^4.13.4"
 pandas = "^2.2.3"
 polars = "^1.27.1"
-huggingface-hub = "^0.30.2"
 datasets = "3.4.0"
 ultralytics = "^8.3.116"
 mediapipe = "0.10.21"
-# Adding dev version to prevent numpy dependency conflict. Make sure to install 0.26.0 when released
-supervision = "0.26.0rc7" 
 coco-eval = "0.0.4"
 pytorch-lightning = "2.5.0"
 dotenv = "^0.9.9"
 rfdetr = "~1.1.0"
 torch = ">=2.6.1"
+supervision = "^0.26.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "8.3.2"
@@ -51,7 +49,6 @@ streamlit-drawable-canvas = "^0.9.3"
 google = "3.0.0"
 google-generativeai = "0.8.5"
 pytest-cov = "^6.2.1"
-
 
 [tool.poetry.group.extras.dependencies]
 yolov9 = {git = "https://github.com/BaseballCV/yolov9.git"}

@@ -75,7 +75,7 @@ class TestSavantScraper:
         df = scraper.play_ids_df
         first_len = len(df)
 
-        df = df[df['release_speed'] >= 85] # Do a test filter
+        df = df[df['release_speed'] >= 90] # Do a test filter
         second_len = len(df)
 
         assert first_len > second_len, 'A filter should decrease the size of the DataFrame'

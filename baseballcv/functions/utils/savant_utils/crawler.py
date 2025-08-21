@@ -42,7 +42,8 @@ def sanitize_date_range(start_dt: str, end_dt: str) -> Tuple[date, date]:
     if end_dt < start_dt:
         end_dt, start_dt = start_dt, end_dt
 
-    assert start_dt >= '2015-03-01', 'Please make queries in Statcast Era (At least 2015).'
+    if start_dt <= '2015-03-01':
+        raise ValueError('Please make queries in Statcast Era (At least 2015).')
 
     start_dt_date, end_dt_date = datetime.strptime(start_dt, "%Y-%m-%d").date(), datetime.strptime(end_dt, "%Y-%m-%d").date()
 

@@ -309,7 +309,7 @@ class LoadTools:
                         ignore_patterns=["*.md", "*.gitattributes", "*.gitignore"]
                     )
 
-                    dataset = dataset.load_dataset(repo_id, split="train")
+                    dataset = datasets.load_dataset(repo_id, split="train")
 
                     for i, example in tqdm(enumerate(dataset["train"]), total=len(dataset["train"])):
                         image, filename = example["image"], example["filename"]
