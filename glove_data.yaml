@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 train: /content/baseball_rubber_home_glove/train/images
 val: /content/baseball_rubber_home_glove/valid/images
 
@@ -5,4 +6,13 @@ names:
   0: glove
   1: homeplate
   2: baseball
+=======
+train: /content/baseball_rubber_home_glove/train/images
+val: /content/baseball_rubber_home_glove/valid/images
+
+names:
+  0: glove
+  1: homeplate
+  2: baseball
+>>>>>>> 495be94 (add dataset)
   3: rubber
