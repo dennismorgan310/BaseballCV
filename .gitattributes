@@ -1,9 +1,6 @@
 # Auto detect text files
 * text=auto
-<<<<<<< HEAD
 
+# Track ZIP files with Git LFS
+*.zip filter=lfs diff=lfs merge=lfs -text
 
-
-=======
-baseball_rubber_home_glove.zip filter=lfs diff=lfs merge=lfs -text
->>>>>>> 495be94 (add dataset)
